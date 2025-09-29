@@ -1,1 +1,10 @@
-<svg width="192" height="192" viewBox="0 0 192 192" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="192" height="192" rx="24" fill="#667eea"/><path d="M96 40C96.4319 40 96.8637 40.0492 97.2847 40.1446C139.285 23.3827 185.355 49.6197 185.355 96C185.355 142.38 139.285 168.617 97.2847 151.855C96.8637 151.951 96.4319 152 96 152C95.5681 152 95.1363 151.951 94.7153 151.855C52.7149 168.617 6.64526 142.38 6.64526 96C6.64526 49.6197 52.7149 23.3827 94.7153 40.1446C95.1363 40.0492 95.5681 40 96 40Z" fill="white"/><path d="M96 48C101.523 48 106 100.523 106 106C106 111.523 101.523 116 96 116C90.4772 116 86 111.523 86 106C86 100.523 90.4772 48 96 48Z" fill="#667eea"/><path d="M96 72C98.2091 72 100 73.7909 100 76C100 78.2091 98.2091 80 96 80C93.7909 80 92 78.2091 92 76C92 73.7909 93.7909 72 96 72Z" fill="white"/></svg>
+<svg width="192" height="192" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e3a8a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1e40af;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" fill="url(#grad1)" rx="28.799999999999997"/>
+  <text x="50%" y="50%" font-family="Arial, sans-serif" font-size="76.80000000000001" font-weight="bold" fill="white" text-anchor="middle" dominant-baseline="central">⛪</text>
+</svg>

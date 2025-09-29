@@ -12,10 +12,24 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   icons: {
     icon: [
-      { url: '/icon-192x192.png', sizes: '192x192', type: 'image/png' },
-      { url: '/icon-512x512.png', sizes: '512x512', type: 'image/png' }
+      { url: '/icon-192x192.svg', sizes: '192x192', type: 'image/svg+xml' },
+      { url: '/icon-512x512.svg', sizes: '512x512', type: 'image/svg+xml' }
     ],
-    apple: '/icon-192x192.png',
+    apple: '/icon-192x192.svg',
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Emmanuel Assembly'
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  openGraph: {
+    type: 'website',
+    siteName: 'Emmanuel Assembly',
+    title: 'Emmanuel Assembly - Church Management System',
+    description: 'Church Management System for The Church of Pentecost — Emmanuel Assembly',
   },
 }
 
@@ -24,7 +38,7 @@ export const viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: '#667eea',
+  themeColor: '#1e3a8a',
 }
 
 export default function RootLayout({
@@ -37,7 +51,10 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,200..900;1,200..900&family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet" />
+        <link 
+          href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,200..900;1,200..900&family=Space+Grotesk:wght@300..700&display=swap" 
+          rel="stylesheet" 
+        />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className={inter.className} style={{ fontFamily: '"Source Sans 3", sans-serif' }}>

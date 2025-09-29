@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline - Emmanuel Assembly</title>
+    <link rel="manifest" href="/manifest.json">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 500px;
+            width: 100%;
+        }
+        
+        .icon {
+            font-size: 5rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, #fbbf24, #f59e0b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            opacity: 0.9;
+        }
+        
+        p {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            margin-bottom: 2rem;
+            opacity: 0.8;
+        }
+        
+        .buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            align-items: center;
+        }
+        
+        button {
+            background: linear-gradient(45deg, #fbbf24, #f59e0b);
+            color: #1e3a8a;
+            border: none;
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 200px;
+            box-shadow: 0 4px 15px rgba(251, 191, 36, 0.3);
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(251, 191, 36, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .status {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+        
+        .loading {
+            display: none;
+            margin-top: 1rem;
+        }
+        
+        .loading.show {
+            display: block;
+        }
+        
+        .spinner {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid #fbbf24;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @media (max-width: 480px) {
+            .icon {
+                font-size: 4rem;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            h2 {
+                font-size: 1.25rem;
+            }
+            
+            p {
+                font-size: 1rem;
+            }
+            
+            button {
+                padding: 14px 28px;
+                font-size: 1rem;
+                min-width: 180px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">⛪</div>
+        <h1>Emmanuel Assembly</h1>
+        <h2>You're Currently Offline</h2>
+        <p>
+            It looks like you've lost your internet connection. Don't worry, 
+            some features are still available offline. Once you're back online, 
+            all your data will be synchronized automatically.
+        </p>
+        
+        <div class="buttons">
+            <button onclick="tryReconnect()">
+                Try Again
+            </button>
+            <button onclick="goToDashboard()">
+                Go to Dashboard
+            </button>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Checking connection...</p>
+        </div>
+        
+        <div class="status" id="status">
+            <p>Status: Offline</p>
+            <p>Last sync: <span id="lastSync">Unknown</span></p>
+        </div>
+    </div>
+
+    <script>
+        // Check if we're back online
+        function tryReconnect() {
+            const loading = document.getElementById('loading');
+            const status = document.getElementById('status');
+            
+            loading.classList.add('show');
+            
+            // Check if we're online
+            if (navigator.onLine) {
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                setTimeout(() => {
+                    loading.classList.remove('show');
+                    status.innerHTML = '<p>Status: Still Offline</p><p>Please check your internet connection</p>';
+                }, 2000);
+            }
+        }
+        
+        // Go to dashboard (will show cached version if offline)
+        function goToDashboard() {
+            window.location.href = '/dashboard';
+        }
+        
+        // Listen for online/offline events
+        window.addEventListener('online', () => {
+            document.getElementById('status').innerHTML = '<p>Status: Back Online!</p><p>Syncing data...</p>';
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        });
+        
+        window.addEventListener('offline', () => {
+            document.getElementById('status').innerHTML = '<p>Status: Offline</p><p>Last sync: <span id="lastSync">Unknown</span></p>';
+        });
+        
+        // Update last sync time
+        function updateLastSync() {
+            const lastSync = localStorage.getItem('lastSync');
+            if (lastSync) {
+                const date = new Date(lastSync);
+                document.getElementById('lastSync').textContent = date.toLocaleString();
+            }
+        }
+        
+        // Initialize
+        updateLastSync();
+        
+        // Check connection status
+        if (navigator.onLine) {
+            document.getElementById('status').innerHTML = '<p>Status: Online</p><p>Last sync: <span id="lastSync">Unknown</span></p>';
+            updateLastSync();
+        }
+    </script>
+</body>
+</html>

@@ -115,7 +115,6 @@ export default function CreateGroupPage() {
       const { data, error } = await supabase
         .from('app_users')
         .select('id, full_name, membership_id, role, phone, email, join_year, created_at, updated_at')
-        .eq('is_active', true)
         .in('role', ['admin', 'pastor', 'elder', 'finance_officer', 'member'])
         .order('full_name', { ascending: true })
 

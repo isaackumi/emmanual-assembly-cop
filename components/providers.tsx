@@ -1,12 +1,23 @@
 'use client'
 
 import { SimpleAuthProvider as AuthProvider } from './simple-auth-provider'
+import { PWAProvider } from './pwa-provider'
+import { ThemeProvider } from './theme-provider'
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <AuthProvider>
-      {children}
-    </AuthProvider>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="light"
+      enableSystem
+      disableTransitionOnChange
+    >
+      <AuthProvider>
+        <PWAProvider>
+          {children}
+        </PWAProvider>
+      </AuthProvider>
+    </ThemeProvider>
   )
 }
 

@@ -1,0 +1,413 @@
+import { useState, useEffect, useCallback } from 'react'
+import { dataService, ApiResponse, PaginatedResponse } from '@/lib/services/data-service'
+import { AppUser, Member, Group, GroupMembership, Attendance, Visitor, DashboardStats } from '@/lib/types'
+
+// Generic hook for data fetching
+export function useApiData<T>(
+  fetchFn: () => Promise<ApiResponse<T>>,
+  dependencies: any[] = []
+) {
+  const [data, setData] = useState<T | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const result = await fetchFn()
+      
+      if (result.error) {
+        setError(result.error)
+        setData(null)
+      } else {
+        setData(result.data)
+        setError(null)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+      setData(null)
+    } finally {
+      setLoading(false)
+    }
+  }, dependencies)
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  const refetch = useCallback(() => {
+    fetchData()
+  }, [fetchData])
+
+  return { data, error, loading, refetch }
+}
+
+// Generic hook for paginated data
+export function usePaginatedData<T>(
+  fetchFn: (page: number, limit: number, search?: string, filter?: string) => Promise<PaginatedResponse<T>>,
+  initialPage: number = 1,
+  initialLimit: number = 20,
+  initialSearch: string = '',
+  initialFilter: string = ''
+) {
+  const [data, setData] = useState<T[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(initialPage)
+  const [limit] = useState(initialLimit)
+  const [search, setSearch] = useState(initialSearch)
+  const [filter, setFilter] = useState(initialFilter)
+  const [hasMore, setHasMore] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const fetchData = useCallback(async (pageNum: number = page, searchTerm: string = search, filterValue: string = filter) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const result = await fetchFn(pageNum, limit, searchTerm, filterValue)
+      
+      if (result.error) {
+        setError(result.error)
+      } else {
+        setData(result.data)
+        setTotal(result.total)
+        setHasMore(result.hasMore)
+        setError(null)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+    } finally {
+      setLoading(false)
+    }
+  }, [fetchFn, page, limit, search, filter])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  const refetch = useCallback(() => {
+    fetchData()
+  }, [fetchData])
+
+  const loadMore = useCallback(() => {
+    if (hasMore && !loading) {
+      const nextPage = page + 1
+      setPage(nextPage)
+      fetchData(nextPage, search, filter)
+    }
+  }, [hasMore, loading, page, search, filter, fetchData])
+
+  const searchData = useCallback((searchTerm: string) => {
+    setSearch(searchTerm)
+    setPage(1)
+    fetchData(1, searchTerm, filter)
+  }, [fetchData, filter])
+
+  const filterData = useCallback((filterValue: string) => {
+    setFilter(filterValue)
+    setPage(1)
+    fetchData(1, search, filterValue)
+  }, [fetchData, search])
+
+  return {
+    data,
+    total,
+    page,
+    hasMore,
+    error,
+    loading,
+    refetch,
+    loadMore,
+    search: searchData,
+    filter: filterData
+  }
+}
+
+// Dashboard hooks
+export function useDashboardStats() {
+  return useApiData(() => dataService.getDashboardStats())
+}
+
+export function useUpcomingEvents() {
+  return useApiData(() => dataService.getUpcomingEvents())
+}
+
+// Members hooks
+export function useMembers(page: number = 1, limit: number = 20, search: string = '') {
+  return usePaginatedData(
+    (pageNum, pageLimit, searchTerm) => dataService.getMembers(pageNum, pageLimit, searchTerm),
+    page,
+    limit,
+    search
+  )
+}
+
+export function useMember(id: string) {
+  return useApiData(() => dataService.getMember(id), [id])
+}
+
+export function useCreateMember() {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const createMember = useCallback(async (memberData: Partial<Member>) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const result = await dataService.createMember(memberData)
+      
+      if (result.error) {
+        setError(result.error)
+        return null
+      }
+      
+      return result.data
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create member'
+      setError(errorMessage)
+      return null
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  return { createMember, loading, error }
+}
+
+export function useUpdateMember() {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const updateMember = useCallback(async (id: string, updates: Partial<Member>) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const result = await dataService.updateMember(id, updates)
+      
+      if (result.error) {
+        setError(result.error)
+        return null
+      }
+      
+      return result.data
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update member'
+      setError(errorMessage)
+      return null
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  return { updateMember, loading, error }
+}
+
+// Groups hooks
+export function useGroups(page: number = 1, limit: number = 20, search: string = '', type: string = '') {
+  return usePaginatedData(
+    (pageNum, pageLimit, searchTerm, filterValue) => 
+      dataService.getGroups(pageNum, pageLimit, searchTerm, filterValue),
+    page,
+    limit,
+    search,
+    type
+  )
+}
+
+export function useGroup(id: string) {
+  return useApiData(() => dataService.getGroup(id), [id])
+}
+
+export function useCreateGroup() {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const createGroup = useCallback(async (groupData: Partial<Group>) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const result = await dataService.createGroup(groupData)
+      
+      if (result.error) {
+        setError(result.error)
+        return null
+      }
+      
+      return result.data
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create group'
+      setError(errorMessage)
+      return null
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  return { createGroup, loading, error }
+}
+
+export function useUpdateGroup() {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const updateGroup = useCallback(async (id: string, updates: Partial<Group>) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const result = await dataService.updateGroup(id, updates)
+      
+      if (result.error) {
+        setError(result.error)
+        return null
+      }
+      
+      return result.data
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update group'
+      setError(errorMessage)
+      return null
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  return { updateGroup, loading, error }
+}
+
+// Group Memberships hooks
+export function useGroupMembers(groupId: string) {
+  return useApiData(() => dataService.getGroupMembers(groupId), [groupId])
+}
+
+export function useAddGroupMember() {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const addGroupMember = useCallback(async (groupId: string, memberId: string, role: string) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const result = await dataService.addGroupMember(groupId, memberId, role)
+      
+      if (result.error) {
+        setError(result.error)
+        return null
+      }
+      
+      return result.data
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to add group member'
+      setError(errorMessage)
+      return null
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  return { addGroupMember, loading, error }
+}
+
+export function useRemoveGroupMember() {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const removeGroupMember = useCallback(async (membershipId: string) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const result = await dataService.removeGroupMember(membershipId)
+      
+      if (result.error) {
+        setError(result.error)
+        return false
+      }
+      
+      return result.data
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to remove group member'
+      setError(errorMessage)
+      return false
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  return { removeGroupMember, loading, error }
+}
+
+// Attendance hooks
+export function useAttendanceHistory(memberId?: string, limit: number = 50) {
+  return useApiData(() => dataService.getAttendanceHistory(memberId, limit), [memberId, limit])
+}
+
+export function useCreateAttendance() {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const createAttendance = useCallback(async (attendanceData: Partial<Attendance>) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const result = await dataService.createAttendance(attendanceData)
+      
+      if (result.error) {
+        setError(result.error)
+        return null
+      }
+      
+      return result.data
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create attendance'
+      setError(errorMessage)
+      return null
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  return { createAttendance, loading, error }
+}
+
+// Visitors hooks
+export function useVisitors(page: number = 1, limit: number = 20, search: string = '') {
+  return usePaginatedData(
+    (pageNum, pageLimit, searchTerm) => dataService.getVisitors(pageNum, pageLimit, searchTerm),
+    page,
+    limit,
+    search
+  )
+}
+
+export function useCreateVisitor() {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const createVisitor = useCallback(async (visitorData: Partial<Visitor>) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const result = await dataService.createVisitor(visitorData)
+      
+      if (result.error) {
+        setError(result.error)
+        return null
+      }
+      
+      return result.data
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create visitor'
+      setError(errorMessage)
+      return null
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  return { createVisitor, loading, error }
+}
+
+// Utility hooks
+export function useAllMembers() {
+  return useApiData(() => dataService.getAllMembers())
+}

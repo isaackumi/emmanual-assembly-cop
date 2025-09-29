@@ -2,10 +2,12 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Navbar } from '@/components/navbar'
+import { useAuth } from '@/components/providers'
 import { QRScanner } from '@/components/qr-scanner'
+import { DashboardLayout } from '@/components/dashboard-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { 
   QrCode, 
   ArrowLeft, 
@@ -18,6 +20,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/use-toast'
 import { formatMembershipIdForDisplay, formatDateTime } from '@/lib/utils'
+import { LoadingSpinner } from '@/components/ui/loading'
 
 interface CheckInResult {
   member: {
@@ -36,11 +39,36 @@ interface CheckInResult {
 }
 
 export default function ScannerPage() {
+  const { user, loading: authLoading } = useAuth()
   const [checkInResult, setCheckInResult] = useState<CheckInResult | null>(null)
   const [loading, setLoading] = useState(false)
+  const [serviceType, setServiceType] = useState('sunday_service')
   const router = useRouter()
   const supabase = createClient()
   const { toast } = useToast()
+
+  const serviceTypes = [
+    { value: 'sunday_service', label: 'Sunday Service' },
+    { value: 'midweek_service', label: 'Midweek Service' },
+    { value: 'prayer_meeting', label: 'Prayer Meeting' },
+    { value: 'youth_service', label: 'Youth Service' },
+    { value: 'children_service', label: 'Children Service' },
+    { value: 'special_event', label: 'Special Event' }
+  ]
+
+  if (authLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <LoadingSpinner />
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (!user) {
+    return null
+  }
 
   const handleScanSuccess = async (decodedText: string) => {
     setLoading(true)
@@ -149,7 +177,7 @@ export default function ScannerPage() {
           phone: memberData.phone
         },
         dependants: memberData.members[0]?.dependants || [],
-        service_type: 'Sunday Service',
+        service_type: serviceTypes.find(s => s.value === serviceType)?.label || 'Sunday Service',
         timestamp: new Date().toISOString()
       })
 
@@ -184,24 +212,45 @@ export default function ScannerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <DashboardLayout>
+      <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center space-x-4 mb-4">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 flex items-center" style={{ fontFamily: '"Space Grotesk", sans-serif' }}>
+                <QrCode className="h-8 w-8 mr-3 text-blue-600" />
+                Attendance Scanner
+              </h1>
+              <p className="text-gray-600">Scan member QR codes to check them in for service</p>
+            </div>
             <Button variant="outline" onClick={() => router.back()}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <h1 className="text-3xl font-bold text-gray-900">
-              QR Code Scanner
-            </h1>
           </div>
-          <p className="text-gray-600">
-            Scan member QR codes to check them in for today's service.
-          </p>
+
+          {/* Service Type Selection */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="text-lg">Service Type</CardTitle>
+              <CardDescription>Select the type of service for attendance</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Select value={serviceType} onValueChange={setServiceType}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select service type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {serviceTypes.map((service) => (
+                    <SelectItem key={service.value} value={service.value}>
+                      {service.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
@@ -362,6 +411,6 @@ export default function ScannerPage() {
           </Card>
         </div>
       </div>
-    </div>
+    </DashboardLayout>
   )
 }

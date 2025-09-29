@@ -9,8 +9,6 @@ import { Badge } from '@/components/ui/badge'
 import { LoadingStats, LoadingGrid, LoadingPage } from '@/components/ui/loading'
 import { ErrorDisplay, EmptyState } from '@/components/ui/error-display'
 import { ErrorBoundary } from '@/components/error-boundary'
-import { DashboardLayout } from '@/components/dashboard-layout'
-import { OfflineSync } from '@/components/offline-sync'
 import { Demographics } from '@/lib/types'
 import { 
   Users, 
@@ -39,17 +37,13 @@ function DashboardContent() {
 
   // Show loading state
   if (authLoading || statsLoading) {
-    return (
-      <DashboardLayout>
-        <LoadingPage title="Loading Dashboard..." description="Fetching your church data..." />
-      </DashboardLayout>
-    )
+    return <LoadingPage title="Loading Dashboard..." description="Fetching your church data..." />
   }
 
   // Show error state
   if (statsError) {
     return (
-      <DashboardLayout>
+      <div className="min-h-screen bg-gray-50 p-8">
         <div className="max-w-7xl mx-auto">
           <ErrorDisplay
             error={statsError}
@@ -58,7 +52,7 @@ function DashboardContent() {
             title="Failed to load dashboard"
           />
         </div>
-      </DashboardLayout>
+      </div>
     )
   }
 
@@ -135,22 +129,22 @@ function DashboardContent() {
   }
 
   return (
-    <DashboardLayout>
+    <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 sm:mb-8 gap-4">
+        <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2" style={{ fontFamily: '"Space Grotesk", sans-serif' }}>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2" style={{ fontFamily: '"Space Grotesk", sans-serif' }}>
               Dashboard
             </h1>
             <p className="text-gray-600">Welcome back, {user?.full_name || 'User'}!</p>
           </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <Button variant="outline" onClick={() => router.push('/members/add')} className="w-full sm:w-auto">
+          <div className="flex items-center space-x-3">
+            <Button variant="outline" onClick={() => router.push('/members/add')}>
               <UserPlus className="h-4 w-4 mr-2" />
               Add Member
             </Button>
-            <Button variant="outline" onClick={() => router.push('/visitors/add')} className="w-full sm:w-auto">
+            <Button variant="outline" onClick={() => router.push('/visitors/add')}>
               <Plus className="h-4 w-4 mr-2" />
               Add Visitor
             </Button>
@@ -158,9 +152,9 @@ function DashboardContent() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="bg-white shadow-sm border border-gray-100">
-            <CardContent className="p-4 sm:p-6">
+            <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-500 mb-1">Total Members</p>
@@ -199,7 +193,7 @@ function DashboardContent() {
                 <div>
                   <p className="text-sm font-medium text-gray-500 mb-1">Recent Attendance</p>
                   <p className="text-3xl font-bold text-gray-900" style={{ fontFamily: '"Space Grotesk", sans-serif' }}>
-                    {stats?.today_attendance || 0}
+                    {stats?.attendance_rate || 0}%
                   </p>
                   <p className="text-xs text-gray-500 mt-1">Last 30 days</p>
                 </div>
@@ -228,9 +222,9 @@ function DashboardContent() {
           </Card>
         </div>
 
-        <div className="grid gap-6 sm:gap-8 lg:grid-cols-3">
+        <div className="grid gap-8 lg:grid-cols-3">
           {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6 sm:space-y-8">
+          <div className="lg:col-span-2 space-y-8">
             {/* Upcoming Events */}
             <Card>
               <CardHeader>
@@ -335,10 +329,10 @@ function DashboardContent() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Button
                     variant="outline"
-                    className="h-16 sm:h-20 flex-col space-y-2"
+                    className="h-20 flex-col space-y-2"
                     onClick={() => router.push('/members')}
                   >
                     <Users className="h-6 w-6" />
@@ -356,7 +350,7 @@ function DashboardContent() {
                   
                   <Button
                     variant="outline"
-                    className="h-16 sm:h-20 flex-col space-y-2"
+                    className="h-20 flex-col space-y-2"
                     onClick={() => router.push('/attendance/scanner')}
                   >
                     <BarChart3 className="h-6 w-6" />
@@ -365,7 +359,7 @@ function DashboardContent() {
                   
                   <Button
                     variant="outline"
-                    className="h-16 sm:h-20 flex-col space-y-2"
+                    className="h-20 flex-col space-y-2"
                     onClick={() => router.push('/visitors')}
                   >
                     <UserPlus className="h-6 w-6" />
@@ -425,13 +419,10 @@ function DashboardContent() {
                 </Button>
               </CardContent>
             </Card>
-
-            {/* Offline Sync Status */}
-            <OfflineSync />
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </div>
   )
 }
 

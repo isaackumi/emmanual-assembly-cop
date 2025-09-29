@@ -24,6 +24,7 @@ export interface AppUser {
   place_of_work?: string
   marital_status?: 'single' | 'married' | 'divorced' | 'widowed' | 'separated'
   spouse_name?: string
+  anniversary_date?: string
   children_count?: number
   emergency_contact_name?: string
   emergency_contact_phone?: string
@@ -490,6 +491,10 @@ export interface DashboardStats {
   prayer_requests: number
   upcoming_birthdays: number
   upcoming_anniversaries: number
+  groups_count: number
+  recent_visitors: number
+  attendance_rate: number
+  visitor_conversion_rate: number
 }
 
 export interface Demographics {

@@ -145,7 +145,6 @@ export default function GroupDetailsPage() {
       const { data, error } = await supabase
         .from('app_users')
         .select('id, full_name, membership_id, phone, email, role, join_year, created_at, updated_at')
-        .eq('is_active', true)
         .not('role', 'eq', 'visitor')
         .order('full_name', { ascending: true })
 

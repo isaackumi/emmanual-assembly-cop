@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
 import { createClient } from '@/lib/supabase/client'
 import { CreateVisitorForm } from '@/lib/types'
+import { DashboardLayout } from '@/components/dashboard-layout'
 import { 
   ArrowLeft, 
   UserPlus, 
@@ -133,9 +134,11 @@ export default function AddVisitorPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-8 flex items-center justify-center">
-        <div className="animate-pulse text-blue-600 text-lg">Loading...</div>
-      </div>
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-pulse text-blue-600 text-lg">Loading...</div>
+        </div>
+      </DashboardLayout>
     )
   }
 
@@ -144,7 +147,7 @@ export default function AddVisitorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <DashboardLayout>
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center mb-6">
           <Button 
@@ -356,6 +359,6 @@ export default function AddVisitorPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </DashboardLayout>
   )
 }

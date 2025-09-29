@@ -12,7 +12,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { LoadingTable, LoadingStats, LoadingPage } from '@/components/ui/loading'
 import { ErrorDisplay, EmptyState } from '@/components/ui/error-display'
 import { ErrorBoundary } from '@/components/error-boundary'
-import { DashboardLayout } from '@/components/dashboard-layout'
 import { 
   Users, 
   Search, 
@@ -83,17 +82,13 @@ function MembersContent() {
 
   // Show loading state
   if (authLoading || loading) {
-    return (
-      <DashboardLayout>
-        <LoadingPage title="Loading Members..." description="Fetching member data..." />
-      </DashboardLayout>
-    )
+    return <LoadingPage title="Loading Members..." description="Fetching member data..." />
   }
 
   // Show error state
   if (error) {
     return (
-      <DashboardLayout>
+      <div className="min-h-screen bg-gray-50 p-8">
         <div className="max-w-7xl mx-auto">
           <ErrorDisplay
             error={error}
@@ -102,7 +97,7 @@ function MembersContent() {
             title="Failed to load members"
           />
         </div>
-      </DashboardLayout>
+      </div>
     )
   }
 
@@ -152,7 +147,7 @@ function MembersContent() {
   }
 
   return (
-    <DashboardLayout>
+    <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -480,7 +475,7 @@ function MembersContent() {
           </TabsContent>
         </Tabs>
       </div>
-    </DashboardLayout>
+    </div>
   )
 }
 

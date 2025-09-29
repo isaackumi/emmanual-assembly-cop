@@ -1,1 +1,125 @@
-if(!self.define){let e,s={};const a=(a,i)=>(a=new URL(a+".js",i).href,s[a]||new Promise(s=>{if("document"in self){const e=document.createElement("script");e.src=a,e.onload=s,document.head.appendChild(e)}else e=a,importScripts(a),s()}).then(()=>{let e=s[a];if(!e)throw new Error(`Module ${a} didn’t register its module`);return e}));self.define=(i,c)=>{const n=e||("document"in self?document.currentScript.src:"")||location.href;if(s[n])return;let t={};const o=e=>a(e,n),r={module:{uri:n},exports:t,require:o};s[n]=Promise.all(i.map(e=>r[e]||o(e))).then(e=>(c(...e),t))}}define(["./workbox-1bb06f5e"],function(e){"use strict";importScripts(),self.skipWaiting(),e.clientsClaim(),e.precacheAndRoute([{url:"/_next/app-build-manifest.json",revision:"2cba45e66ffe31b9aa2fd7e256b6ba14"},{url:"/_next/static/MzaP0yyNcP3iREM6oYS4O/_buildManifest.js",revision:"41a968fdf4a5a66f7c385d388f55a779"},{url:"/_next/static/MzaP0yyNcP3iREM6oYS4O/_ssgManifest.js",revision:"b6652df95db52feb4daf4eca35380933"},{url:"/_next/static/chunks/112-dba98a8bfd7ca7f2.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/156-705603f9e926d8b5.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/295-a477481dbb28442a.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/372-3b18153f20ee24a2.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/58-3c7b90873afd6692.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/747-da0ae8b7b50468c3.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/795-89a04b9346b9de20.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/7cb1fa1f-e0cace965b068377.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/833-aa4397a046ae414e.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/859-6c89881c003f6e38.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/895-e09370397fc025cc.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/938-34bef1d408873272.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/app/_not-found-4b4acadd4cddffa9.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/app/attendance/kiosk/page-19adfa973aaf6b06.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/app/attendance/scanner/page-5c061f09b215d58a.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/app/auth/page-5ed6b44bffc06f22.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/app/dashboard/page-cfa75cb266723070.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/app/groups/page-9a3674c1030f2146.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/app/layout-162f88ecf7cbbb16.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/app/members/%5Bid%5D/page-88d3dfc226b00dc1.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/app/members/add/page-20a264525a476841.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/app/members/page-9dbf80b15cb1d3c6.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/app/page-83aba23901e55958.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/app/test-auth/page-9779a121a0cd6875.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/app/visitors/add/page-8096de7d7440dc42.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/app/visitors/page-29cdcc7b17564a6b.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/fd9d1056-7fda3e9b28bca7f7.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/framework-c5181c9431ddc45b.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/main-4bb6612ea24f7dad.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/main-app-93f774e2ef59dd45.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/pages/_app-98cb51ec6f9f135f.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/pages/_error-9157e57c362a0d0d.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/chunks/polyfills-c67a75d1b6f99dc8.js",revision:"837c0df77fd5009c9e46d446188ecfd0"},{url:"/_next/static/chunks/webpack-836c0477ed173487.js",revision:"MzaP0yyNcP3iREM6oYS4O"},{url:"/_next/static/css/c9029585a6765e85.css",revision:"c9029585a6765e85"},{url:"/_next/static/media/19cfc7226ec3afaa-s.woff2",revision:"9dda5cfc9a46f256d0e131bb535e46f8"},{url:"/_next/static/media/21350d82a1f187e9-s.woff2",revision:"4e2553027f1d60eff32898367dd4d541"},{url:"/_next/static/media/8e9860b6e62d6359-s.woff2",revision:"01ba6c2a184b8cba08b0d57167664d75"},{url:"/_next/static/media/ba9851c3c22cd980-s.woff2",revision:"9e494903d6b0ffec1a1e14d34427d44d"},{url:"/_next/static/media/c5fe6dc8356a8c31-s.woff2",revision:"027a89e9ab733a145db70f09b8a18b42"},{url:"/_next/static/media/df0a9ae256c0569c-s.woff2",revision:"d54db44de5ccb18886ece2fda72bdfe0"},{url:"/_next/static/media/e4af272ccee01ff0-s.p.woff2",revision:"65850a373e258f1c897a2b3d75eb74de"},{url:"/icon-192x192.png",revision:"d71ca18f4e180743b0c453389c7f4265"},{url:"/icon-192x192.svg",revision:"01af2a32bacdea16356983e69609d7ab"},{url:"/icon-512x512.png",revision:"9d6eae084a3f178fcc50d5722fb9ccae"},{url:"/icon.svg",revision:"2d0b18d35cfaeb1819157061a1d21317"},{url:"/login-bg.svg",revision:"de92efbf4cb70e3ca336ab80ea8565fb"},{url:"/manifest.json",revision:"398eb19913150235abeadee7d952b79a"}],{ignoreURLParametersMatching:[]}),e.cleanupOutdatedCaches(),e.registerRoute("/",new e.NetworkFirst({cacheName:"start-url",plugins:[{cacheWillUpdate:async({request:e,response:s,event:a,state:i})=>s&&"opaqueredirect"===s.type?new Response(s.body,{status:200,statusText:"OK",headers:s.headers}):s}]}),"GET"),e.registerRoute(/^https:\/\/fonts\.googleapis\.com\/.*/i,new e.CacheFirst({cacheName:"google-fonts",plugins:[new e.ExpirationPlugin({maxEntries:4,maxAgeSeconds:31536e3})]}),"GET"),e.registerRoute(/^https:\/\/fonts\.gstatic\.com\/.*/i,new e.CacheFirst({cacheName:"google-fonts-static",plugins:[new e.ExpirationPlugin({maxEntries:4,maxAgeSeconds:31536e3})]}),"GET"),e.registerRoute(/\.(?:eot|otf|ttc|ttf|woff|woff2|font.css)$/i,new e.StaleWhileRevalidate({cacheName:"static-font-assets",plugins:[new e.ExpirationPlugin({maxEntries:4,maxAgeSeconds:604800})]}),"GET"),e.registerRoute(/\.(?:jpg|jpeg|gif|png|svg|ico|webp)$/i,new e.StaleWhileRevalidate({cacheName:"static-image-assets",plugins:[new e.ExpirationPlugin({maxEntries:64,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\/_next\/image\?url=.+$/i,new e.StaleWhileRevalidate({cacheName:"next-image",plugins:[new e.ExpirationPlugin({maxEntries:64,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:mp3|wav|ogg)$/i,new e.CacheFirst({cacheName:"static-audio-assets",plugins:[new e.RangeRequestsPlugin,new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:mp4)$/i,new e.CacheFirst({cacheName:"static-video-assets",plugins:[new e.RangeRequestsPlugin,new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:js)$/i,new e.StaleWhileRevalidate({cacheName:"static-js-assets",plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:css|less)$/i,new e.StaleWhileRevalidate({cacheName:"static-style-assets",plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/^https:\/\/.*\.supabase\.co\/.*/i,new e.NetworkFirst({cacheName:"supabase-api-cache",networkTimeoutSeconds:10,plugins:[new e.ExpirationPlugin({maxEntries:16,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/.*/i,new e.NetworkFirst({cacheName:"others",networkTimeoutSeconds:10,plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET")});
+const CACHE_NAME = "emmanuel-assembly-v1.0.0";
+const STATIC_CACHE_URLS = [
+  "/",
+  "/dashboard",
+  "/members",
+  "/visitors",
+  "/groups",
+  "/attendance",
+  "/manifest.json",
+  "/offline.html"
+];
+
+// Install event - cache static assets
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(STATIC_CACHE_URLS);
+    })
+  );
+  // Force the waiting service worker to become the active service worker
+  self.skipWaiting();
+});
+
+// Activate event - clean up old caches
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    })
+  );
+  // Ensure the service worker takes control immediately
+  return self.clients.claim();
+});
+
+// Fetch event - handle requests with proper redirect handling
+self.addEventListener("fetch", (event) => {
+  // Skip non-GET requests
+  if (event.request.method !== "GET") {
+    return;
+  }
+
+  // Skip chrome-extension and other non-http requests
+  if (!event.request.url.startsWith("http")) {
+    return;
+  }
+
+  event.respondWith(
+    caches.match(event.request).then((cachedResponse) => {
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+
+      // For navigation requests, handle redirects properly
+      if (event.request.mode === "navigate") {
+        return fetch(event.request, {
+          redirect: "follow" // Explicitly follow redirects
+        }).then((response) => {
+          // If the fetch fails, return offline page
+          if (!response || response.status !== 200 || response.type !== "basic") {
+            return caches.match("/offline.html");
+          }
+          
+          // Cache the successful response
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseClone);
+          });
+          
+          return response;
+        }).catch(() => {
+          return caches.match("/offline.html");
+        });
+      }
+
+      // For other requests, fetch with redirect handling
+      return fetch(event.request, {
+        redirect: "follow"
+      }).then((response) => {
+        // Don't cache non-successful responses
+        if (!response || response.status !== 200 || response.type !== "basic") {
+          return response;
+        }
+
+        // Cache successful responses
+        const responseClone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseClone);
+        });
+
+        return response;
+      }).catch(() => {
+        // For API calls, return a proper error response
+        if (event.request.url.includes("/api/")) {
+          return new Response(
+            JSON.stringify({ error: "Offline" }),
+            {
+              status: 503,
+              statusText: "Service Unavailable",
+              headers: { "Content-Type": "application/json" }
+            }
+          );
+        }
+        return new Response("Offline", { status: 503 });
+      });
+    })
+  );
+});
+
+// Background sync for offline actions
+self.addEventListener("sync", (event) => {
+  if (event.tag === "background-sync") {
+    event.waitUntil(doBackgroundSync());
+  }
+});
+
+async function doBackgroundSync() {
+  // This would sync offline actions when back online
+  console.log("Background sync triggered");
+}

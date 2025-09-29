@@ -20,7 +20,7 @@ import { formatMembershipIdForDisplay, formatPhoneNumber } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 
 interface KioskFormProps {
-  onCheckInSuccess: (member: Member, dependants?: Dependant[]) => void
+  onCheckInSuccess: (member: AppUser, dependants?: Dependant[]) => void
   className?: string
 }
 
@@ -44,14 +44,15 @@ export function KioskForm({ onCheckInSuccess, className }: KioskFormProps) {
     try {
       const query = searchInput.trim()
       
-      // Search by membership ID or phone number
+      // Search by membership ID or phone number through members table
       const { data, error } = await supabase
-        .from('app_users')
+        .from('members')
         .select(`
           *,
-          members (*)
+          user:app_users(*)
         `)
-        .or(`membership_id.ilike.%${query}%,phone.ilike.%${query}%,full_name.ilike.%${query}%`)
+        .eq('status', 'active')
+        .or(`user.membership_id.ilike.%${query}%,user.phone.ilike.%${query}%,user.full_name.ilike.%${query}%`)
         .limit(10)
 
       if (error) {
@@ -64,7 +65,15 @@ export function KioskForm({ onCheckInSuccess, className }: KioskFormProps) {
         return
       }
 
-      setSearchResults(data || [])
+      // Transform the data to match the expected interface
+      const transformedResults = (data || [])
+        .filter(member => member.user) // Only include members with user data
+        .map(member => ({
+          ...member.user,
+          member: member
+        }))
+      
+      setSearchResults(transformedResults)
     } catch (error) {
       console.error('Search error:', error)
       toast({
@@ -170,7 +179,7 @@ export function KioskForm({ onCheckInSuccess, className }: KioskFormProps) {
         description: `${selectedMember.full_name} has been checked in successfully.`,
       })
 
-      onCheckInSuccess(selectedMember.member, dependants.filter(d => selectedDependants.includes(d.id)))
+      onCheckInSuccess(selectedMember, dependants.filter(d => selectedDependants.includes(d.id)))
 
       // Reset form
       setSelectedMember(null)

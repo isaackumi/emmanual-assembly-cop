@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast'
 import { createClient } from '@/lib/supabase/client'
 import { generateMembershipId } from '@/lib/membershipId'
 import { CreateUserForm } from '@/lib/types'
+import { DashboardLayout } from '@/components/dashboard-layout'
 import { 
   ArrowLeft, 
   UserPlus, 
@@ -275,9 +276,11 @@ export default function AddMemberPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-8 flex items-center justify-center">
-        <div className="animate-pulse text-blue-600 text-lg">Loading...</div>
-      </div>
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-pulse text-blue-600 text-lg">Loading...</div>
+        </div>
+      </DashboardLayout>
     )
   }
 
@@ -688,7 +691,7 @@ export default function AddMemberPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <DashboardLayout>
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center">
@@ -849,6 +852,6 @@ export default function AddMemberPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </DashboardLayout>
   )
 }

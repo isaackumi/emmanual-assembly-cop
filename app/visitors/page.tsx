@@ -61,7 +61,7 @@ export default function VisitorsPage() {
           *,
           invited_by:members(user:app_users(full_name))
         `)
-        .eq('is_active', true)
+        .eq('status', 'active')
         .order('visit_date', { ascending: false })
 
       if (error) {

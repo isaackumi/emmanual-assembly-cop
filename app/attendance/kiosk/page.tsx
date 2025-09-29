@@ -1,197 +1,379 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Navbar } from '@/components/navbar'
+import { useAuth } from '@/components/providers'
+import { DashboardLayout } from '@/components/dashboard-layout'
 import { KioskForm } from '@/components/kiosk-form'
+import { AppUser, Dependant } from '@/lib/types'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { LoadingSpinner } from '@/components/ui/loading'
 import { 
   Monitor, 
   ArrowLeft, 
   CheckCircle, 
-  Users,
-  QrCode,
-  Calendar
+  User,
+  Calendar,
+  Clock,
+  Users
 } from 'lucide-react'
-import { Member, Dependant } from '@/lib/types'
+import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/use-toast'
+import { formatMembershipIdForDisplay, formatDateTime } from '@/lib/utils'
+
+interface CheckInResult {
+  member: {
+    id: string
+    full_name: string
+    membership_id: string
+    phone?: string
+  }
+  dependants?: Array<{
+    id: string
+    name: string
+    relationship: string
+  }>
+  service_type: string
+  timestamp: string
+}
 
 export default function KioskPage() {
-  const [recentCheckIns, setRecentCheckIns] = useState<Array<{
-    member: Member
-    dependants?: Dependant[]
-    timestamp: string
-  }>>([])
-  
+  const { user, loading: authLoading } = useAuth()
+  const [checkInResult, setCheckInResult] = useState<CheckInResult | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [serviceType, setServiceType] = useState('sunday_service')
   const router = useRouter()
+  const supabase = createClient()
   const { toast } = useToast()
 
-  const handleCheckInSuccess = (member: Member, dependants?: Dependant[]) => {
-    // Add to recent check-ins
-    setRecentCheckIns(prev => [{
-      member,
-      dependants,
-      timestamp: new Date().toISOString()
-    }, ...prev.slice(0, 4)]) // Keep only last 5
+  const serviceTypes = [
+    { value: 'sunday_service', label: 'Sunday Service' },
+    { value: 'midweek_service', label: 'Midweek Service' },
+    { value: 'prayer_meeting', label: 'Prayer Meeting' },
+    { value: 'youth_service', label: 'Youth Service' },
+    { value: 'children_service', label: 'Children Service' },
+    { value: 'special_event', label: 'Special Event' }
+  ]
 
-    // Could also show a success animation or sound here
+  if (authLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <LoadingSpinner />
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (!user) {
+    return null
+  }
+
+  const handleCheckIn = async (member: AppUser, dependants: Dependant[] = []) => {
+    setLoading(true)
+    try {
+      // Record attendance for main member
+      const { error: memberError } = await supabase
+        .from('attendance')
+        .insert({
+          member_id: member.id,
+          service_date: new Date().toISOString().split('T')[0],
+          service_type: serviceTypes.find(s => s.value === serviceType)?.label || 'Sunday Service',
+          check_in_time: new Date().toISOString(),
+          status: 'present',
+          checked_in_by: user.id
+        })
+
+      if (memberError) throw memberError
+
+      // Record attendance for dependants if any
+      if (dependants.length > 0) {
+        const dependantAttendance = dependants.map(dependant => ({
+          member_id: dependant.id,
+          service_date: new Date().toISOString().split('T')[0],
+          service_type: serviceTypes.find(s => s.value === serviceType)?.label || 'Sunday Service',
+          check_in_time: new Date().toISOString(),
+          status: 'present',
+          checked_in_by: user.id
+        }))
+
+        const { error: dependantsError } = await supabase
+          .from('attendance')
+          .insert(dependantAttendance)
+
+        if (dependantsError) throw dependantsError
+      }
+
+      // Set check-in result with the provided data
+      setCheckInResult({
+        member: {
+          id: member.id,
+          full_name: member.full_name,
+          membership_id: member.membership_id,
+          phone: member.phone
+        },
+        dependants: dependants.map(d => ({
+          id: d.id,
+          name: d.first_name,
+          relationship: d.relationship
+        })),
+        service_type: serviceTypes.find(s => s.value === serviceType)?.label || 'Sunday Service',
+        timestamp: new Date().toISOString()
+      })
+
+      toast({
+        title: "Check-in Successful",
+        description: `${member.full_name} has been checked in successfully.`,
+        variant: "default"
+      })
+    } catch (error) {
+      console.error('Error checking in member:', error)
+      toast({
+        title: "Check-in Failed",
+        description: "There was an error checking in the member. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleNewCheckIn = () => {
+    setCheckInResult(null)
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <DashboardLayout>
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-4">
-              <Button variant="outline" onClick={() => router.back()}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
-              <h1 className="text-3xl font-bold text-gray-900">
-                Kiosk Check-in
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 flex items-center" style={{ fontFamily: '"Space Grotesk", sans-serif' }}>
+                <Monitor className="h-8 w-8 mr-3 text-blue-600" />
+                Kiosk Mode
               </h1>
+              <p className="text-gray-600">Self-service attendance check-in for members</p>
             </div>
-            <div className="flex space-x-2">
+            <Button variant="outline" onClick={() => router.back()}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+          </div>
+
+          {/* Service Type Selection */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="text-lg">Service Type</CardTitle>
+              <CardDescription>Select the type of service for attendance</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Select value={serviceType} onValueChange={setServiceType}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select service type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {serviceTypes.map((service) => (
+                    <SelectItem key={service.value} value={service.value}>
+                      {service.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Kiosk Form */}
+          <div>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <User className="h-5 w-5 mr-2 text-blue-600" />
+                  Member Check-in
+                </CardTitle>
+                <CardDescription>
+                  Search for a member by membership ID, phone, or name to check them in
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <KioskForm 
+                  onCheckInSuccess={handleCheckIn}
+                />
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Check-in Result */}
+          <div>
+            {checkInResult ? (
+              <Card className="border-green-200 bg-green-50">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-green-800">
+                    <CheckCircle className="h-5 w-5 mr-2" />
+                    Check-in Successful
+                  </CardTitle>
+                  <CardDescription className="text-green-600">
+                    Member has been successfully checked in
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="bg-white p-4 rounded-lg border border-green-200">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                        <User className="h-6 w-6 text-green-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900">
+                          {checkInResult.member.full_name}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          {formatMembershipIdForDisplay(checkInResult.member.membership_id)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="flex items-center">
+                        <Calendar className="h-4 w-4 mr-2 text-gray-400" />
+                        <span className="text-gray-600">Service:</span>
+                        <span className="ml-2 font-medium">{checkInResult.service_type}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <Clock className="h-4 w-4 mr-2 text-gray-400" />
+                        <span className="text-gray-600">Time:</span>
+                        <span className="ml-2 font-medium">
+                          {formatDateTime(checkInResult.timestamp)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {checkInResult.dependants && checkInResult.dependants.length > 0 && (
+                      <div className="mt-4">
+                        <div className="flex items-center mb-2">
+                          <Users className="h-4 w-4 mr-2 text-gray-400" />
+                          <span className="text-sm font-medium text-gray-600">Dependants:</span>
+                        </div>
+                        <div className="space-y-1">
+                          {checkInResult.dependants.map((dependant) => (
+                            <div key={dependant.id} className="text-sm text-gray-600">
+                              • {dependant.name} ({dependant.relationship})
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <Button 
+                    onClick={handleNewCheckIn}
+                    className="w-full"
+                    variant="outline"
+                  >
+                    Check In Another Member
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Monitor className="h-5 w-5 mr-2 text-blue-600" />
+                    Instructions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3 text-sm text-gray-600">
+                    <div className="flex items-start">
+                      <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center mr-3 mt-0.5">
+                        <span className="text-xs font-semibold text-blue-600">1</span>
+                      </div>
+                      <div>
+                        <p className="font-medium">Search for Member</p>
+                        <p>Enter membership ID, phone number, or name to find the member</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start">
+                      <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center mr-3 mt-0.5">
+                        <span className="text-xs font-semibold text-blue-600">2</span>
+                      </div>
+                      <div>
+                        <p className="font-medium">Select Dependants</p>
+                        <p>Choose any family members to check in together</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start">
+                      <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center mr-3 mt-0.5">
+                        <span className="text-xs font-semibold text-blue-600">3</span>
+                      </div>
+                      <div>
+                        <p className="font-medium">Confirm Check-in</p>
+                        <p>Review details and confirm the attendance</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <h4 className="font-medium text-blue-900 mb-2">Service Information</h4>
+                    <div className="text-sm text-blue-700">
+                      <p><strong>Service:</strong> {serviceTypes.find(s => s.value === serviceType)?.label}</p>
+                      <p><strong>Date:</strong> {new Date().toLocaleDateString()}</p>
+                      <p><strong>Time:</strong> {new Date().toLocaleTimeString()}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Quick Actions</CardTitle>
+            <CardDescription>Navigate to other attendance features</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <Button 
                 variant="outline" 
                 onClick={() => router.push('/attendance/scanner')}
+                className="h-20 flex-col space-y-2"
               >
-                <QrCode className="h-4 w-4 mr-2" />
-                QR Scanner
+                <User className="h-6 w-6" />
+                <span>QR Scanner</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => router.push('/attendance/manual')}
+                className="h-20 flex-col space-y-2"
+              >
+                <Users className="h-6 w-6" />
+                <span>Manual Check-in</span>
               </Button>
               <Button 
                 variant="outline" 
                 onClick={() => router.push('/attendance')}
+                className="h-20 flex-col space-y-2"
               >
-                <Calendar className="h-4 w-4 mr-2" />
-                View Attendance
+                <Calendar className="h-6 w-6" />
+                <span>View Attendance</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => router.push('/dashboard')}
+                className="h-20 flex-col space-y-2"
+              >
+                <ArrowLeft className="h-6 w-6" />
+                <span>Dashboard</span>
               </Button>
             </div>
-          </div>
-          <p className="text-gray-600">
-            Search for members and check them in for today's service.
-          </p>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Main Kiosk Form */}
-          <div className="lg:col-span-2">
-            <KioskForm onCheckInSuccess={handleCheckInSuccess} />
-          </div>
-
-          {/* Recent Check-ins */}
-          <div>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                  <span>Recent Check-ins</span>
-                </CardTitle>
-                <CardDescription>
-                  Today's successful check-ins
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {recentCheckIns.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                    <p>No check-ins yet today</p>
-                    <p className="text-sm">Check-ins will appear here</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {recentCheckIns.map((checkIn, index) => (
-                      <div key={index} className="flex items-center space-x-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                        <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">
-                            {checkIn.member.user?.full_name || 'Unknown Member'}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {new Date(checkIn.timestamp).toLocaleTimeString()}
-                          </p>
-                          {checkIn.dependants && checkIn.dependants.length > 0 && (
-                            <p className="text-xs text-gray-500">
-                              +{checkIn.dependants.length} family member(s)
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Quick Stats */}
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle className="text-lg">Today's Stats</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Total Check-ins:</span>
-                    <span className="font-medium">{recentCheckIns.length}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Family Members:</span>
-                    <span className="font-medium">
-                      {recentCheckIns.reduce((sum, checkIn) => 
-                        sum + (checkIn.dependants?.length || 0), 0
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Service:</span>
-                    <span className="font-medium">Sunday Service</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        {/* Instructions */}
-        <div className="mt-8">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Monitor className="h-5 w-5" />
-                <span>Kiosk Mode Instructions</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <h4 className="font-medium mb-2">For Members:</h4>
-                  <ul className="text-sm text-gray-600 space-y-1">
-                    <li>• Approach the kiosk and wait for assistance</li>
-                    <li>• Provide your membership ID, phone number, or name</li>
-                    <li>• Select any family members to check in together</li>
-                    <li>• Confirm your details and complete check-in</li>
-                  </ul>
-                </div>
-                <div>
-                  <h4 className="font-medium mb-2">For Administrators:</h4>
-                  <ul className="text-sm text-gray-600 space-y-1">
-                    <li>• Use the search function to find members quickly</li>
-                    <li>• Verify member identity before check-in</li>
-                    <li>• Include family members when requested</li>
-                    <li>• Monitor recent check-ins for accuracy</li>
-                  </ul>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+          </CardContent>
+        </Card>
       </div>
-    </div>
+    </DashboardLayout>
   )
 }

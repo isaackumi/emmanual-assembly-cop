@@ -1,158 +1,517 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { useAuth } from './providers'
+import { useRouter, usePathname } from 'next/navigation'
+import { useAuth } from '@/components/providers'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { 
   LayoutDashboard,
   Users,
-  Calendar,
-  DollarSign,
-  Settings,
-  Wrench,
-  MessageSquare,
   UserPlus,
-  FileText,
-  UserCog,
-  Brain,
+  Calendar,
+  BarChart3,
+  Settings,
   LogOut,
-  Church,
   Menu,
-  X
+  X,
+  Home,
+  User,
+  Group,
+  MessageSquare,
+  Bell,
+  HelpCircle,
+  ChevronLeft,
+  ChevronRight,
+  QrCode,
+  Monitor,
+  CheckSquare,
+  DollarSign,
+  CreditCard,
+  Clock,
+  FileText,
+  Mail,
+  Shield,
+  Zap,
+  Target,
+  TrendingUp,
+  Gift
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
 
-interface NavItem {
-  name: string
-  href: string
-  icon: React.ComponentType<{ className?: string }>
-  roles?: string[]
+interface SidebarProps {
+  className?: string
 }
 
-const navigation: NavItem[] = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Members', href: '/members', icon: Users },
-  { name: 'Attendance', href: '/attendance', icon: Calendar },
-  { name: 'Finance', href: '/finance', icon: DollarSign },
-  { name: 'Equipment', icon: Wrench, href: '/equipment' },
-  { name: 'SMS Broadcast', href: '/sms', icon: MessageSquare },
-  { name: 'Visitors', href: '/visitors', icon: UserPlus },
-  { name: 'Reports', href: '/reports', icon: FileText },
-  { name: 'Users', href: '/admin/users', icon: UserCog, roles: ['admin'] },
-  { name: 'Settings', href: '/settings', icon: Settings },
-  { name: 'AI Features', href: '/ai', icon: Brain },
+const navigationSections = [
+  {
+    title: 'CORE MANAGEMENT',
+    items: [
+      {
+        name: 'Dashboard',
+        href: '/dashboard',
+        icon: LayoutDashboard
+      },
+      {
+        name: 'Members',
+        href: '/members',
+        icon: Users
+      },
+      {
+        name: 'Visitors',
+        href: '/visitors',
+        icon: UserPlus
+      },
+      {
+        name: 'Groups',
+        href: '/groups',
+        icon: Group
+      },
+      {
+        name: 'Events',
+        href: '/events',
+        icon: Calendar
+      },
+      {
+        name: 'Ministries',
+        href: '/ministries',
+        icon: Group
+      }
+    ]
+  },
+      {
+        title: 'ATTENDANCE SYSTEM',
+        items: [
+          {
+            name: 'QR Scanner',
+            href: '/attendance/scanner',
+            icon: QrCode
+          },
+          {
+            name: 'Kiosk Mode',
+            href: '/attendance/kiosk',
+            icon: Monitor
+          },
+          {
+            name: 'Manual Check-in',
+            href: '/attendance/manual',
+            icon: CheckSquare
+          },
+          {
+            name: 'Bulk Attendance',
+            href: '/attendance/bulk',
+            icon: Users
+          }
+        ]
+      },
+  {
+    title: 'FINANCIAL',
+    items: [
+      {
+        name: 'Donations',
+        href: '/financial/donations',
+        icon: DollarSign
+      },
+      {
+        name: 'Payments',
+        href: '/financial/payments',
+        icon: CreditCard
+      },
+      {
+        name: 'Budget',
+        href: '/financial/budget',
+        icon: Clock
+      },
+      {
+        name: 'Reports',
+        href: '/financial/reports',
+        icon: FileText
+      }
+    ]
+  },
+  {
+    title: 'COMMUNICATION',
+    items: [
+      {
+        name: 'SMS',
+        href: '/communication/sms',
+        icon: MessageSquare
+      },
+      {
+        name: 'Email',
+        href: '/communication/email',
+        icon: Mail
+      },
+      {
+        name: 'Notifications',
+        href: '/communication/notifications',
+        icon: Bell
+      }
+    ]
+  },
+  {
+    title: 'AI FEATURES',
+    items: [
+      {
+        name: 'Smart Insights',
+        href: '/ai/insights',
+        icon: Zap
+      },
+      {
+        name: 'Analytics',
+        href: '/ai/analytics',
+        icon: Target
+      },
+      {
+        name: 'Attendance AI',
+        href: '/ai/attendance',
+        icon: TrendingUp
+      }
+    ]
+  }
 ]
 
-export function Sidebar() {
-  const { user, signOut } = useAuth()
+const settingsNavigation = [
+  {
+    name: 'General',
+    href: '/settings/general',
+    icon: Settings
+  },
+  {
+    name: 'Security',
+    href: '/settings/security',
+    icon: Shield
+  }
+]
+
+export function Sidebar({ className }: SidebarProps) {
+  const router = useRouter()
   const pathname = usePathname()
-  const [isMobileOpen, setIsMobileOpen] = useState(false)
+  const { user, signOut } = useAuth()
+  const [collapsed, setCollapsed] = useState(false)
 
-  const filteredNavigation = navigation.filter(item => {
-    if (!item.roles) return true
-    return user?.role && item.roles.includes(user.role)
-  })
+  const handleLogout = async () => {
+    await signOut()
+    router.push('/auth')
+  }
 
-  if (!user) return null
+  const isActiveRoute = (href: string) => {
+    if (href === '/dashboard') {
+      return pathname === '/dashboard' || pathname === '/'
+    }
+    return pathname.startsWith(href)
+  }
+
+  return (
+    <div className={cn(
+      'flex flex-col h-full bg-blue-900 transition-all duration-300',
+      collapsed ? 'w-16' : 'w-72',
+      className
+    )}>
+      {/* Header */}
+      <div className="flex items-center justify-between p-6 border-b border-blue-800">
+        {!collapsed && (
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center">
+              <LayoutDashboard className="h-6 w-6 text-slate-900" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white" style={{ fontFamily: '"Space Grotesk", sans-serif' }}>
+                Church of Pentecost
+              </h1>
+              <p className="text-sm text-white">Emmanuel Assembly</p>
+              <p className="text-xs text-yellow-400">Odorkor Area, Gbawe CP District</p>
+            </div>
+          </div>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setCollapsed(!collapsed)}
+          className="p-2 text-blue-200 hover:text-white hover:bg-blue-800"
+        >
+          {collapsed ? (
+            <ChevronRight className="h-4 w-4" />
+          ) : (
+            <ChevronLeft className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+
+      {/* User Info */}
+      {!collapsed && (
+        <div className="p-6 border-b border-blue-800">
+          <div className="flex items-center space-x-3">
+            <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center">
+              <User className="h-6 w-6 text-slate-900" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">
+                {user?.full_name || 'System Administrator'}
+              </p>
+              <p className="text-xs text-blue-200 truncate">
+                {user?.role?.replace('_', ' ') || 'Admin'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Navigation */}
+      <nav className="flex-1 px-4 py-4 space-y-6 overflow-y-auto">
+        {navigationSections.map((section) => (
+          <div key={section.title} className="space-y-2">
+            {!collapsed && (
+              <h3 className="text-xs font-semibold text-blue-200 uppercase tracking-wider px-3">
+                {section.title}
+              </h3>
+            )}
+            <div className="space-y-1">
+              {section.items.map((item) => {
+                const Icon = item.icon
+                const isActive = isActiveRoute(item.href)
+                const isAISection = section.title === 'AI FEATURES'
+                
+                return (
+                  <Button
+                    key={item.name}
+                    variant="ghost"
+                    className={cn(
+                      'w-full justify-start px-3 py-2 h-auto',
+                      collapsed && 'px-2',
+                      isActive 
+                        ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                        : isAISection
+                        ? 'text-yellow-400 hover:text-yellow-300 hover:bg-blue-800'
+                        : 'text-blue-100 hover:text-white hover:bg-blue-800'
+                    )}
+                    onClick={() => router.push(item.href)}
+                  >
+                    <Icon className={cn(
+                      'h-4 w-4',
+                      !collapsed && 'mr-3',
+                      isAISection && !isActive && 'text-yellow-400'
+                    )} />
+                    {!collapsed && <span className="text-sm">{item.name}</span>}
+                  </Button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      {/* Settings Section */}
+      {!collapsed && (
+        <div className="px-4 py-4 border-t border-blue-800 space-y-2">
+          <h3 className="text-xs font-semibold text-blue-200 uppercase tracking-wider px-3">
+            SETTINGS
+          </h3>
+          <div className="space-y-1">
+            {settingsNavigation.map((item) => {
+              const Icon = item.icon
+              const isActive = isActiveRoute(item.href)
+              
+              return (
+                <Button
+                  key={item.name}
+                  variant="ghost"
+                  className={cn(
+                    'w-full justify-start px-3 py-2 h-auto',
+                    isActive 
+                      ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                      : 'text-blue-100 hover:text-white hover:bg-blue-800'
+                  )}
+                  onClick={() => router.push(item.href)}
+                >
+                  <Icon className="h-4 w-4 mr-3" />
+                  <span className="text-sm">{item.name}</span>
+                </Button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Recommendations Button */}
+      {!collapsed && (
+        <div className="p-4">
+          <Button
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white justify-start px-3 py-2 h-auto"
+            onClick={() => router.push('/recommendations')}
+          >
+            <Gift className="h-4 w-4 mr-3 text-yellow-400" />
+            <span className="text-sm">Recommendations</span>
+          </Button>
+        </div>
+      )}
+
+      {/* Logout Button */}
+      <div className="p-4 border-t border-blue-800">
+        <Button
+          variant="ghost"
+          className={cn(
+            'w-full justify-start text-blue-100 hover:text-white hover:bg-blue-800',
+            collapsed ? 'px-2' : 'px-3'
+          )}
+          onClick={handleLogout}
+        >
+          <LogOut className={cn('h-4 w-4', !collapsed && 'mr-3')} />
+          {!collapsed && <span className="text-sm">Logout</span>}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// Mobile sidebar component
+export function MobileSidebar() {
+  const [open, setOpen] = useState(false)
+  const router = useRouter()
+  const pathname = usePathname()
+  const { user, signOut } = useAuth()
+
+  const handleLogout = async () => {
+    await signOut()
+    router.push('/auth')
+  }
+
+  const isActiveRoute = (href: string) => {
+    if (href === '/dashboard') {
+      return pathname === '/dashboard' || pathname === '/'
+    }
+    return pathname.startsWith(href)
+  }
 
   return (
     <>
       {/* Mobile menu button */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setIsMobileOpen(!isMobileOpen)}
-          className="bg-white shadow-lg"
-        >
-          {isMobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </Button>
-      </div>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setOpen(true)}
+        className="lg:hidden p-2 text-slate-600"
+      >
+        <Menu className="h-5 w-5" />
+      </Button>
 
-      {/* Mobile overlay */}
-      {isMobileOpen && (
-        <div 
-          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
-          onClick={() => setIsMobileOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <div className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-emerald-400 to-yellow-400 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
-        isMobileOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="flex items-center justify-center px-6 py-8">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg">
-                <Church className="h-6 w-6 text-emerald-600" />
+      {/* Mobile sidebar overlay */}
+      {open && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setOpen(false)} />
+          <div className="fixed inset-y-0 left-0 w-72 bg-blue-900 shadow-xl">
+            <div className="flex items-center justify-between p-6 border-b border-blue-800">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center">
+                  <LayoutDashboard className="h-6 w-6 text-slate-900" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-white" style={{ fontFamily: '"Space Grotesk", sans-serif' }}>
+                    Church of Pentecost
+                  </h1>
+                  <p className="text-sm text-white">Emmanuel Assembly</p>
+                  <p className="text-xs text-yellow-400">Odorkor Area, Gbawe CP District</p>
+                </div>
               </div>
-              <div className="text-white">
-                <h1 className="text-lg font-bold">Church Management</h1>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setOpen(false)}
+                className="p-2 text-blue-200 hover:text-white hover:bg-blue-800"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* User Info */}
+            <div className="p-6 border-b border-blue-800">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center">
+                  <User className="h-6 w-6 text-slate-900" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white truncate">
+                    {user?.full_name || 'System Administrator'}
+                  </p>
+                  <p className="text-xs text-blue-200 truncate">
+                    {user?.role?.replace('_', ' ') || 'Admin'}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 px-4 pb-4">
-            <ul className="space-y-2">
-              {filteredNavigation.map((item) => {
-                const isActive = pathname === item.href
-                return (
-                  <li key={item.name}>
-                    <Link
-                      href={item.href}
-                      onClick={() => setIsMobileOpen(false)}
-                      className={cn(
-                        "flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors duration-200",
-                        isActive
-                          ? "bg-white bg-opacity-20 text-white shadow-lg"
-                          : "text-white hover:bg-white hover:bg-opacity-10"
-                      )}
-                    >
-                      {isActive && (
-                        <div className="w-1 h-6 bg-white rounded-full mr-3" />
-                      )}
-                      <item.icon className={cn("h-5 w-5 mr-3", !isActive && "mr-6")} />
-                      {item.name}
-                    </Link>
-                  </li>
-                )
-              })}
-            </ul>
-          </nav>
+            {/* Navigation */}
+            <nav className="flex-1 px-4 py-4 space-y-6 overflow-y-auto">
+              {navigationSections.map((section) => (
+                <div key={section.title} className="space-y-2">
+                  <h3 className="text-xs font-semibold text-blue-200 uppercase tracking-wider px-3">
+                    {section.title}
+                  </h3>
+                  <div className="space-y-1">
+                    {section.items.map((item) => {
+                      const Icon = item.icon
+                      const isActive = isActiveRoute(item.href)
+                      const isAISection = section.title === 'AI FEATURES'
+                      
+                      return (
+                        <Button
+                          key={item.name}
+                          variant="ghost"
+                          className={cn(
+                            'w-full justify-start px-3 py-2 h-auto',
+                            isActive 
+                              ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                              : isAISection
+                              ? 'text-yellow-400 hover:text-yellow-300 hover:bg-blue-800'
+                              : 'text-blue-100 hover:text-white hover:bg-blue-800'
+                          )}
+                          onClick={() => {
+                            router.push(item.href)
+                            setOpen(false)
+                          }}
+                        >
+                          <Icon className={cn(
+                            'h-4 w-4 mr-3',
+                            isAISection && !isActive && 'text-yellow-400'
+                          )} />
+                          <span className="text-sm">{item.name}</span>
+                        </Button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </nav>
 
-          {/* User section */}
-          <div className="px-4 py-4 border-t border-white border-opacity-20">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
-                <span className="text-emerald-600 text-sm font-bold">
-                  {user.full_name?.charAt(0).toUpperCase()}
-                </span>
-              </div>
-              <div className="text-white">
-                <p className="text-sm font-medium">{user.full_name}</p>
-                <p className="text-xs opacity-80 capitalize">
-                  {user.role.replace('_', ' ')}
-                </p>
-              </div>
+            {/* Recommendations Button */}
+            <div className="p-4">
+              <Button
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white justify-start px-3 py-2 h-auto"
+                onClick={() => {
+                  router.push('/recommendations')
+                  setOpen(false)
+                }}
+              >
+                <Gift className="h-4 w-4 mr-3 text-yellow-400" />
+                <span className="text-sm">Recommendations</span>
+              </Button>
             </div>
-            
-            <Button
-              onClick={signOut}
-              variant="ghost"
-              className="w-full justify-start text-white hover:bg-white hover:bg-opacity-10"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
-            </Button>
+
+            {/* Logout */}
+            <div className="p-4 border-t border-blue-800">
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-blue-100 hover:text-white hover:bg-blue-800 px-3"
+                onClick={handleLogout}
+              >
+                <LogOut className="h-4 w-4 mr-3" />
+                <span className="text-sm">Logout</span>
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </>
   )
 }
+
+export default Sidebar
