@@ -11,8 +11,12 @@ const nextConfig = {
     })
     return config
   },
-  // Minimal configuration
-  swcMinify: true,
+  // Disable build traces to prevent micromatch recursion
+  experimental: {
+    buildTrace: false,
+  },
+  // Force disable build traces
+  generateBuildId: () => 'build',
 }
 
 module.exports = nextConfig
