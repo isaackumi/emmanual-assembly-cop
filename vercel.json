@@ -9,7 +9,9 @@
   },
   "build": {
     "env": {
-      "NEXT_TELEMETRY_DISABLED": "1"
+      "NEXT_TELEMETRY_DISABLED": "1",
+      "NEXT_BUILD_TRACE": "0"
     }
-  }
+  },
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD ./"
 }

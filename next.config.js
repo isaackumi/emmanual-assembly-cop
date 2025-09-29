@@ -11,12 +11,8 @@ const nextConfig = {
     })
     return config
   },
-  // Minimal configuration to avoid build traces issues
+  // Minimal configuration
   swcMinify: true,
-  // Disable build traces completely
-  experimental: {
-    buildTrace: false,
-  },
 }
 
 module.exports = nextConfig

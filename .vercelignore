@@ -1,4 +1,4 @@
-# Exclude all problematic files from Vercel builds
+# Exclude all build artifacts and problematic files
 .next/
 node_modules/
 .env*
@@ -20,3 +20,6 @@ scripts/
 *.swp
 *.swo
 bun.lockb
+# Exclude specific problematic patterns
+**/[*]/**
+**/*\[*\]*
