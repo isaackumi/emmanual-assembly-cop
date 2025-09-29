@@ -10,8 +10,6 @@ coverage/
 .next/
 out/
 build/
-
-# Production
 dist/
 
 # Environment variables
@@ -21,7 +19,7 @@ dist/
 .env.test.local
 .env.production.local
 
-# Debug
+# Debug logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -63,3 +61,7 @@ supabase/.temp
 
 # Bun
 bun.lockb
+
+# Temporary files
+*.tmp
+*.temp
