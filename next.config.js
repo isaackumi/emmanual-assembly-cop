@@ -11,12 +11,12 @@ const nextConfig = {
     })
     return config
   },
-  // Disable build traces to prevent micromatch recursion
-  experimental: {
-    buildTrace: false,
-  },
-  // Force disable build traces
-  generateBuildId: () => 'build',
+  // Use static build ID to avoid build traces
+  generateBuildId: () => 'static-build',
+  // Disable all build optimizations that might cause issues
+  swcMinify: false,
+  // Disable source maps
+  productionBrowserSourceMaps: false,
 }
 
 module.exports = nextConfig
