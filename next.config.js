@@ -11,10 +11,6 @@ const nextConfig = {
     })
     return config
   },
-  experimental: {
-    // Disable build traces to avoid recursion issues
-    buildTrace: false,
-  },
 }
 
 module.exports = nextConfig
