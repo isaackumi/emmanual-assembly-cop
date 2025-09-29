@@ -1,0 +1,13 @@
+# Exclude problematic files from Vercel builds
+.next/
+node_modules/
+.env*
+*.log
+.DS_Store
+Thumbs.db
+*.tmp
+*.temp
+supabase/.temp
+supabase/.branches
+coverage/
+.nyc_output/

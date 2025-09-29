@@ -11,6 +11,16 @@ const nextConfig = {
     })
     return config
   },
+  // Optimize for Vercel
+  output: 'standalone',
+  // Disable source maps in production to reduce complexity
+  productionBrowserSourceMaps: false,
+  // Reduce bundle analysis complexity
+  swcMinify: true,
+  // Disable build optimization that might cause recursion
+  experimental: {
+    webpackBuildWorker: false,
+  },
 }
 
 module.exports = nextConfig

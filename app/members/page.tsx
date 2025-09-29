@@ -90,7 +90,7 @@ export default function MembersPage() {
         .from('members')
         .select(`
           *,
-          user:app_users(full_name, membership_id, phone, email, role, created_at)
+          user:app_users(full_name, membership_id, phone, email, role, marital_status, created_at)
         `)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
@@ -121,7 +121,7 @@ export default function MembersPage() {
         .from('members')
         .select(`
           *,
-          user:app_users(full_name, membership_id, phone, email, role, created_at)
+          user:app_users(full_name, membership_id, phone, email, role, marital_status, created_at)
         `)
         .eq('is_active', true)
         .not('dob', 'is', null)

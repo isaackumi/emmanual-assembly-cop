@@ -1,10 +1,5 @@
 # Dependencies
 node_modules/
-.pnp
-.pnp.js
-
-# Testing
-coverage/
 
 # Next.js
 .next/
@@ -32,8 +27,6 @@ yarn-error.log*
 # IDE
 .vscode/
 .idea/
-*.swp
-*.swo
 
 # OS
 .DS_Store
@@ -65,3 +58,13 @@ bun.lockb
 # Temporary files
 *.tmp
 *.temp
+
+# Build artifacts
+*.tgz
+*.tar.gz
+
+# Coverage
+coverage/
+
+# Testing
+.nyc_output/
