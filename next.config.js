@@ -13,8 +13,6 @@ const nextConfig = {
   },
   // Use static build ID to avoid build traces
   generateBuildId: () => 'static-build',
-  // Disable all build optimizations that might cause issues
-  swcMinify: false,
   // Disable source maps
   productionBrowserSourceMaps: false,
 }

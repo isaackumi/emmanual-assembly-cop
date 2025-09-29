@@ -284,7 +284,7 @@ export default function GroupsPage() {
                     <Button variant="ghost" size="sm" onClick={() => router.push(`/groups/${group.id}`)}>
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" onClick={() => router.push(`/groups/${group.id}`)}>
                       <Edit className="h-4 w-4" />
                     </Button>
                     <Button variant="ghost" size="sm">
@@ -357,7 +357,10 @@ export default function GroupsPage() {
                   : 'Get started by creating your first group.'
                 }
               </p>
-              <Button className="bg-blue-600 hover:bg-blue-700">
+              <Button 
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => router.push('/groups/add')}
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Create Group
               </Button>
