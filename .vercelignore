@@ -1,4 +1,4 @@
-# Exclude problematic files from Vercel builds
+# Exclude all problematic files from Vercel builds
 .next/
 node_modules/
 .env*
@@ -11,3 +11,12 @@ supabase/.temp
 supabase/.branches
 coverage/
 .nyc_output/
+__tests__/
+scripts/
+*.md
+!README.md
+.vscode/
+.idea/
+*.swp
+*.swo
+bun.lockb
