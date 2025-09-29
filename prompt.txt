@@ -1,0 +1,370 @@
+You are an expert senior full-stack developer. Build a **complete production-ready Church Management System (ChMS)** for administrators at **The Church of Pentecost — Emmanuel Assembly (Odorkor Area, Gbawe CP District)** using the following stack and guidelines.
+
+**High-level tech**
+
+* Frontend: **Next.js (App Router)** + **TypeScript** + **Tailwind CSS** + **shadcn/ui** components + **react-bento-grid** + modern UI patterns (cards, grids, responsive).
+* Backend: **Supabase** (Postgres, Auth, Storage, Edge Functions). Use Supabase SQL migrations for schema + RLS policies.
+* PWA: offline-first using service worker, IndexedDB for local queue, background sync.
+* SMS Integration: provider abstraction (support Twilio, Africa’s Talking, etc.) via Edge Functions / server routes.
+* Hosting: Frontend → Vercel. Supabase hosts DB & functions.
+
+**Policy:** Admins / Data Team create users (no open signups). Authentication supports phone OTP and membership ID (or phone). Login accepts `EA` membership IDs with or without hyphen.
+
+---
+
+## High-level goals & constraints
+
+1. **Admin-only user creation**: All user accounts are created by Admin/Data team in the system (UI + bulk CSV import). Standard users (members/elders/pastors) do not self-register.
+2. **Membership ID**:
+
+   * Format: `EA-XXXXYYYY` where `EA` = Emmanuel Assembly, `XXXX` = 4 digits (random or last 4 of phone if provided), `YYYY` = year joined.
+   * System accepts ID input with or without hyphen (e.g., `EA12342021` or `EA-1234-2021` or `EA-12342021`); normalize by stripping non-alphanumerics.
+   * Admins may override generated IDs when needed.
+3. **Auth**:
+
+   * Primary login: **Phone number** (OTP) OR **Membership ID** (OTP or password if set).
+   * Support optional password for staff accounts with 2FA for admin/pastor roles.
+4. **RBAC**: Roles: `admin`, `pastor`, `elder`, `finance_officer`, `member`, `visitor`. Use Supabase `users.role` claim + Postgres RLS.
+5. **Attendance-first**: Attendance subsystem must be rock-solid: QR check-in, kiosk mode, parent-linked child check-in, offline buffering/sync, server validation, audit logs.
+6. **PWA**: Offline capture of attendance & visitor forms; local queue sync on connectivity; idempotency and conflict resolution.
+7. **Export & Search**: Server-side exports to CSV/XLSX/PDF; advanced search with Postgres full-text and trigram fallback.
+
+---
+
+## Deliverables (complete)
+
+* Next.js repo scaffold (App Router, TypeScript, Tailwind, shadcn/ui, bento grid).
+* Supabase SQL migration scripts (schema + indexes + RLS policies + helper functions/triggers).
+* Supabase Edge Functions: `keepAlive`, `smsDispatcher`, scheduled jobs (heartbeat), and `scheduledExports`.
+* UI pages & components:
+
+  * Admin panel: Users import/create, role management, membership ID generator, bulk upload.
+  * Auth pages: login (phone / membership id), OTP flows, staff password + 2FA setup.
+  * Member profile page with **profile completion %** and dependants/family-tree editor.
+  * Attendance pages: scanner (html5-qrcode), kiosk mode, admin bulk checkin, child check-in by parent ID.
+  * Dashboard per-role (Admin / Pastor / Elder / Finance / Member).
+  * Settings: groups (Youth, Women Fellowship, Choir), SMS templates, export scheduler, custom fields.
+* Full PWA config (manifest, service worker via `next-pwa`) and IndexedDB sync utilities.
+* SMS provider abstraction and example adapter (e.g., Twilio).
+* Exports endpoints & worker to generate Excel (exceljs) and stream large CSV.
+* Test data seed script + README + deployment instructions (Vercel + Supabase env).
+* CI/CD suggestions (Vercel + GitHub Actions for edge functions, migrations).
+
+---
+
+## Required Supabase Schema (SQL) — include as migration files
+
+Provide SQL that creates these tables and helper functions. Use `gen_random_uuid()` for IDs or `bigserial` where noted. Include indices, `tsvector` for search, and `pg_trgm` indexes for fuzzy.
+
+### Core tables (include constraints & indexes)
+
+* `app_users` — NOT the auth.users; mirror of auth users with roles and profile metadata:
+
+```sql
+CREATE TABLE app_users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  auth_uid UUID UNIQUE, -- link to supabase.auth.users if used
+  membership_id TEXT UNIQUE,
+  phone TEXT,
+  email TEXT,
+  full_name TEXT,
+  role TEXT NOT NULL DEFAULT 'member',
+  profile_completion NUMERIC DEFAULT 0, -- 0..100
+  join_year INT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+```
+
+* `members` — extended profile (one-to-one with app_users for member details)
+
+```sql
+CREATE TABLE members (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES app_users(id) ON DELETE CASCADE,
+  dob DATE,
+  gender TEXT,
+  address TEXT,
+  emergency_contacts JSONB, -- array of {name, relation, phone}
+  profile_photo TEXT,
+  documents JSONB,
+  status TEXT DEFAULT 'active', -- active, visitor, transferred, inactive
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+```
+
+* `dependants`
+
+```sql
+CREATE TABLE dependants (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  member_id UUID REFERENCES members(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  relationship TEXT, -- child, sibling, guardian
+  dob DATE,
+  membership_id TEXT, -- optional for children when created
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+```
+
+* `attendance`
+
+```sql
+CREATE TABLE attendance (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  member_id UUID REFERENCES members(id),
+  dependant_id UUID REFERENCES dependants(id),
+  service_date DATE NOT NULL,
+  service_type TEXT,
+  check_in_time TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  method TEXT DEFAULT 'qr', -- qr, kiosk, admin, pin, mobile
+  metadata JSONB,
+  created_by UUID REFERENCES app_users(id), -- which user (admin) created it if any
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+CREATE INDEX idx_attendance_service_date ON attendance(service_date);
+```
+
+* `donations`, `pledges`, `expenses`, `messages`, `prayer_requests`, `equipment`, `audit_logs`, `heartbeat` (simple) — create similar to earlier schema.
+
+### Membership ID helper function (SQL)
+
+```sql
+CREATE OR REPLACE FUNCTION generate_membership_id(p_phone TEXT, p_join_year INT) RETURNS TEXT AS $$
+DECLARE
+  digits TEXT;
+BEGIN
+  IF p_phone IS NULL OR length(p_phone) < 4 THEN
+    digits := lpad((floor(random() * 10000))::text, 4, '0');
+  ELSE
+    digits := right(regexp_replace(p_phone, '\D','','g'), 4);
+  END IF;
+  RETURN 'EA-' || digits || p_join_year::text;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### Search tsvector and trigram index for `app_users.full_name`, `members.address`:
+
+```sql
+ALTER TABLE app_users ADD COLUMN search_vector tsvector;
+CREATE INDEX idx_app_users_trgm ON app_users USING gin(full_name gin_trgm_ops);
+CREATE INDEX idx_app_users_tsv ON app_users USING gin(search_vector);
+-- trigger function to update tsvector on insert/update
+```
+
+---
+
+## RLS policies — full and comprehensive (examples)
+
+Enable RLS on each sensitive table and implement policies matching RBAC. Provide SQL for policies:
+
+### Example (members table)
+
+```sql
+ALTER TABLE members ENABLE ROW LEVEL SECURITY;
+
+-- Admins can select all
+CREATE POLICY members_select_admin ON members FOR SELECT
+USING (EXISTS (
+  SELECT 1 FROM app_users WHERE auth.uid() = app_users.auth_uid AND app_users.role = 'admin'
+));
+
+-- Members can view their own
+CREATE POLICY members_select_self ON members FOR SELECT
+USING (EXISTS (
+  SELECT 1 FROM app_users au WHERE au.id = members.user_id AND au.auth_uid = auth.uid()
+));
+
+-- Admins/pastors/elders can insert
+CREATE POLICY members_insert_roles ON members FOR INSERT
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM app_users WHERE auth.uid() = app_users.auth_uid AND app_users.role IN ('admin','pastor','elder')
+  )
+);
+
+-- Updates: members update own limited fields; admins override all
+CREATE POLICY members_update_roles ON members FOR UPDATE
+USING (
+  EXISTS(SELECT 1 FROM app_users WHERE auth.uid() = app_users.auth_uid AND app_users.role IN ('admin','pastor','elder'))
+)
+WITH CHECK (
+  EXISTS(SELECT 1 FROM app_users WHERE auth.uid() = app_users.auth_uid AND app_users.role IN ('admin','pastor','elder'))
+);
+
+CREATE POLICY members_update_self ON members FOR UPDATE
+USING (EXISTS(SELECT 1 FROM app_users au WHERE au.id = members.user_id AND au.auth_uid = auth.uid()))
+WITH CHECK (members.user_id = (SELECT id FROM app_users WHERE auth.uid() = auth.uid()));
+```
+
+Apply analogous policies to `attendance`, `dependants`, `donations`, `messages`, etc. Include policies that allow:
+
+* members to insert their own attendance (by checking `members.user_id` matches `auth.uid()`),
+* kiosk/admin inserts via service role key (server-side) — keep service role writes restricted to server code.
+
+---
+
+## Next.js App structure & core components (deliver code)
+
+Provide a full file list and implement key files:
+
+```
+/app
+  /auth
+    page.tsx (phone/id login)
+    /otp
+      route.ts (receive/send OTP using supabase)
+  /dashboard
+    page.tsx
+  /members
+    page.tsx
+    [id]/page.tsx
+  /attendance
+    scanner/page.tsx
+    kiosk/page.tsx
+  /api
+    /sync/route.ts   -- server endpoint for client sync queue (uses service role key)
+    /qr/generate/route.ts
+    /sms/send/route.ts
+/lib
+  supabaseClient.ts
+  supabaseAdmin.ts  -- uses SUPABASE_SERVICE_ROLE_KEY
+  membershipId.ts   -- normalize (strip non-alnum), generate function
+/components
+  Navbar.tsx
+  ProfileCompletionCard.tsx
+  FamilyTree.tsx
+  QRScanner.tsx
+  KioskForm.tsx
+  RoleGuard.tsx
+/pages (if needed for compatibility)
+/public
+next.config.js
+manifest.json
+service-worker.js (via next-pwa)
+```
+
+### Key implementation notes & code snippets (include actual code in Cursor)
+
+* **membershipId.ts** utils:
+
+```ts
+export function normalizeMembershipId(raw: string) {
+  return raw.replace(/\W+/g, '').toUpperCase(); // strips hyphens, spaces, etc.
+}
+
+export function formatMembershipIdForDisplay(id: string) {
+  // ensure EA-XXXXYYYY display form
+  const s = normalizeMembershipId(id);
+  // s like EA12342021 or EA12342021 -> transform to EA-1234-2021 or EA-12342021 as desired
+  if (s.startsWith('EA') && s.length >= 10) {
+    return `EA-${s.slice(2,6)}${s.slice(6)}`; // adapt as needed
+  }
+  return id;
+}
+```
+
+* **Auth flow**:
+
+  * Login form: input either phone or membership ID. If membership ID entered, normalize and call backend to issue OTP to associated phone. If phone entered, send OTP to phone.
+  * On OTP verification, create/link `auth` user in Supabase and ensure `app_users.auth_uid` populated.
+  * Admin-only endpoint to create `app_users` & `members` and optionally send activation SMS.
+
+* **Profile completion**: server-side computed (trigger or materialized column):
+
+  * assign weights (example): contact = 25, photo = 15, emergency = 15, documents = 20, dependants = 10, other fields = 15 -> sum to 100.
+  * compute on update and store in `app_users.profile_completion`.
+
+* **Family tree (dependants)**: implement `FamilyTree` component showing parent → children, sibling links. Provide edit UI to add relationship type.
+
+* **Attendance flow**:
+
+  * QR generation: store signed JWT payload inside QR (member_id + exp + nonce) OR simpler: encode membership_id + short token. Generate via server (`/api/qr/generate`) and store token in `qr_tokens` table with expiry.
+  * Scanner (kiosk/tablet) parses QR payload and POSTs to `/api/attendance/checkin`. Server validates token and inserts attendance using `supabaseAdmin` (service role).
+  * For parent-based child check-in: scanner can accept parent membership ID and child selection list.
+  * Offline mode: scanner app (PWA) writes to local IndexedDB queue `attendance_queue`. Background sync drains queue to `/api/sync` when online. Server validates, inserts, returns status.
+
+* **Sync & Idempotency**:
+
+  * On client create queue item assign `client_uuid` and `created_at`. On server, check if an attendance with same `client_uuid` exists to avoid duplicates. Add `client_uuid` column to `attendance`.
+
+* **Edge functions**:
+
+  * `keepAlive` scheduled (runs every 5-10m) inserts into `heartbeat` table so Supabase doesn't sleep.
+  * `smsDispatcher` handles provider-specific sending and webhooks for delivery receipts.
+
+* **Excel/CSV exports**:
+
+  * Server-side endpoints that accept filters & RBAC; produce streamed CSV or Excel using `exceljs`. For big exports, enqueue job in `exports_queue` and notify when ready.
+
+---
+
+## UI/UX details
+
+* Mobile-first responsive layout, use shadcn/ui for primitives and supply bento-grid based dashboards.
+* Login screen: simple single input (phone or membership ID) + button → determine route (OTP or fetch user).
+* Profile page: show `ProfileCompletionCard` with progress bar & checklist items.
+* Admin import: CSV upload with mapping UI, preview, dry-run validation, errors report.
+
+---
+
+## Testing & QA
+
+* Provide unit tests for:
+
+  * membership id generation & normalization
+  * RLS policy simulation SQL examples
+  * sync queue handling (client/server)
+  * attendance high-load simulation (abuse prevention)
+* Acceptance criteria:
+
+  * Attendance capture success >= 99% in pilot run.
+  * Offline items sync within expected retry window.
+  * RLS policies prevent unauthorized reads/writes for non-admins.
+
+---
+
+## Dev & Deployment instructions (brief)
+
+1. Create Supabase project; run provided SQL migrations.
+2. Add environment variables:
+
+   * `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   * `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (server only)
+   * `SMS_PROVIDER_*` credentials
+   * `NEXTAUTH_*` (if using NextAuth as optional)
+3. `pnpm install` in Next.js project.
+4. `pnpm dev` locally.
+5. Deploy frontend to Vercel, set env vars. Deploy Edge Functions via Supabase CLI.
+6. Schedule `keepAlive` edge function cron (5–10 minutes).
+
+---
+
+## Acceptance & Handover
+
+Provide:
+
+* GitHub repo with branches: `main`, `develop`.
+* README with run & deploy steps + data seed script.
+* Post-deployment checklist + admin training guide (how to create users, manage roles, generate QR codes, run exports).
+
+---
+
+## Extra instructions (for Cursor)
+
+* Generate actual code for all above files (Next.js pages/components/hooks), the SQL migration files, Edge Function source, and at least one SMS adapter (Twilio example).
+* Ensure any secrets (service role) are only referenced server-side — never embedded into client bundles.
+* Create sample seed data for 50 members including households with dependants to show family tree & profile completion.
+* Add comments in code explaining RBAC enforcement and RLS rationale.
+* Provide a minimal Cypress or Playwright test that simulates login→QR checkin→offline queue sync.
+
+---
+
+### Final note
+
+This is the **full product implementation** scope. If the generated project is too large to complete in a single Cursor run, prioritize in this order: **Auth + RBAC + Admin user creation + Membership ID handling + attendance capture (QR + kiosk) + offline sync** — then add dependants, exports and SMS.
+
+Produce code and SQL that can be run immediately after setting Supabase and Vercel envs. Include a README and a `deploy.md` with step-by-step instructions.

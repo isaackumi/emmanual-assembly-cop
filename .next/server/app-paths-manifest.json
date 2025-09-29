@@ -1,0 +1,19 @@
+{
+  "/_not-found": "app/_not-found.js",
+  "/api/auth/direct-login/route": "app/api/auth/direct-login/route.js",
+  "/auth/page": "app/auth/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/attendance/kiosk/page": "app/attendance/kiosk/page.js",
+  "/api/otp/route": "app/api/otp/route.js",
+  "/api/members/refresh-profile-completion/route": "app/api/members/refresh-profile-completion/route.js",
+  "/api/sync/route": "app/api/sync/route.js",
+  "/attendance/scanner/page": "app/attendance/scanner/page.js",
+  "/members/page": "app/members/page.js",
+  "/test-auth/page": "app/test-auth/page.js",
+  "/members/[id]/page": "app/members/[id]/page.js",
+  "/members/add/page": "app/members/add/page.js",
+  "/visitors/add/page": "app/visitors/add/page.js",
+  "/visitors/page": "app/visitors/page.js",
+  "/groups/page": "app/groups/page.js",
+  "/page": "app/page.js"
+}
