@@ -6,6 +6,9 @@ import { useAuth } from '@/components/providers'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { dataService } from '@/lib/services/data-service'
 import { useQuery } from '@tanstack/react-query'
@@ -44,15 +47,119 @@ export default function MemberProfilePage() {
   const params = useParams()
   const { toast } = useToast()
 
-  const [member, setMember] = useState<MemberWithDetails | null>(null)
   const [attendanceHistory, setAttendanceHistory] = useState<Attendance[]>([])
   const [loading, setLoading] = useState(true)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editForm, setEditForm] = useState({
+    full_name: '',
+    phone: '',
+    email: '',
+    role: '',
+    address: '',
+    occupation: '',
+    place_of_work: '',
+    marital_status: '',
+    spouse_name: '',
+    children_count: 0,
+    emergency_contact_name: '',
+    emergency_contact_phone: '',
+    emergency_contact_relation: ''
+  })
 
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/auth')
     }
   }, [user, authLoading, router])
+
+  const handleEdit = () => {
+    setIsEditing(true)
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditing(false)
+    // Reset form to original values
+    if (memberQuery.data?.data) {
+      const memberData = memberQuery.data.data
+      setEditForm({
+        full_name: memberData.user?.full_name || '',
+        phone: memberData.user?.phone || '',
+        email: memberData.user?.email || '',
+        role: memberData.user?.role || '',
+        address: memberData.address || '',
+        occupation: memberData.user?.occupation || '',
+        place_of_work: memberData.user?.place_of_work || '',
+        marital_status: memberData.user?.marital_status || '',
+        spouse_name: memberData.user?.spouse_name || '',
+        children_count: memberData.user?.children_count || 0,
+        emergency_contact_name: memberData.user?.emergency_contact_name || '',
+        emergency_contact_phone: memberData.user?.emergency_contact_phone || '',
+        emergency_contact_relation: memberData.user?.emergency_contact_relation || ''
+      })
+    }
+  }
+
+  const handleSaveEdit = async () => {
+    if (!memberQuery.data?.data?.user) return
+
+    try {
+      setLoading(true)
+      
+      // For now, we'll use a simple approach - in a real app, you'd want to add update methods to the data service
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
+      
+      // Update user information
+      const { error: userError } = await supabase
+        .from('app_users')
+        .update({
+          full_name: editForm.full_name,
+          phone: editForm.phone,
+          email: editForm.email,
+          role: editForm.role,
+          occupation: editForm.occupation,
+          place_of_work: editForm.place_of_work,
+          marital_status: editForm.marital_status,
+          spouse_name: editForm.spouse_name,
+          children_count: editForm.children_count,
+          emergency_contact_name: editForm.emergency_contact_name,
+          emergency_contact_phone: editForm.emergency_contact_phone,
+          emergency_contact_relation: editForm.emergency_contact_relation
+        })
+        .eq('id', memberQuery.data.data.user.id)
+
+      if (userError) throw userError
+
+      // Update member information
+      const { error: memberError } = await supabase
+        .from('members')
+        .update({
+          address: editForm.address
+        })
+        .eq('id', memberQuery.data.data.id)
+
+      if (memberError) throw memberError
+
+      toast({
+        title: "Profile Updated",
+        description: "Member information has been successfully updated.",
+        variant: "default"
+      })
+
+      setIsEditing(false)
+      // Refresh member data
+      memberQuery.refetch()
+    } catch (error) {
+      console.error('Error updating member:', error)
+      toast({
+        title: "Update Failed",
+        description: "Failed to update member information. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const memberQuery = useQuery({
     queryKey: ['member-profile', params.id],
@@ -68,13 +175,35 @@ export default function MemberProfilePage() {
     staleTime: 30_000
   })
 
+  // Initialize edit form when member data loads
   useEffect(() => {
-    if (memberQuery.data?.data) setMember(memberQuery.data.data as unknown as MemberWithDetails)
+    if (memberQuery.data?.data) {
+      const memberData = memberQuery.data.data
+      setEditForm({
+        full_name: memberData.user?.full_name || '',
+        phone: memberData.user?.phone || '',
+        email: memberData.user?.email || '',
+        role: memberData.user?.role || '',
+        address: memberData.address || '',
+        occupation: memberData.user?.occupation || '',
+        place_of_work: memberData.user?.place_of_work || '',
+        marital_status: memberData.user?.marital_status || '',
+        spouse_name: memberData.user?.spouse_name || '',
+        children_count: memberData.user?.children_count || 0,
+        emergency_contact_name: memberData.user?.emergency_contact_name || '',
+        emergency_contact_phone: memberData.user?.emergency_contact_phone || '',
+        emergency_contact_relation: memberData.user?.emergency_contact_relation || ''
+      })
+    }
   }, [memberQuery.data])
 
   useEffect(() => {
     if (attendanceQuery.data?.data) setAttendanceHistory(attendanceQuery.data.data as Attendance[])
   }, [attendanceQuery.data])
+
+  // Get member data
+  const member = memberQuery.data?.data
+  const attendance = attendanceQuery.data?.data || []
 
   // Calculate profile completion using frontend logic
   const profileCompletion = member ? calculateProfileCompletion(member.user!, member) : null
@@ -154,10 +283,30 @@ export default function MemberProfilePage() {
             </div>
           </div>
           <div className="flex items-center space-x-3">
-            <Button variant="outline">
-              <Edit className="h-4 w-4 mr-2" />
-              Edit Profile
-            </Button>
+            {user?.role === 'admin' && (
+              <Button 
+                variant="outline" 
+                onClick={isEditing ? handleSaveEdit : handleEdit}
+                disabled={loading}
+              >
+                {isEditing ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </>
+                ) : (
+                  <>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Profile
+                  </>
+                )}
+              </Button>
+            )}
+            {isEditing && (
+              <Button variant="outline" onClick={handleCancelEdit}>
+                Cancel
+              </Button>
+            )}
             <Button variant="outline">
               <Camera className="h-4 w-4 mr-2" />
               Change Photo
@@ -338,33 +487,165 @@ export default function MemberProfilePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Primary Phone</label>
-                    <p className="text-gray-900">{member.user?.phone || 'Not provided'}</p>
+                {isEditing ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="full_name">Full Name</Label>
+                        <Input
+                          id="full_name"
+                          value={editForm.full_name}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, full_name: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="role">Role</Label>
+                        <Select value={editForm.role} onValueChange={(value) => setEditForm(prev => ({ ...prev, role: value }))}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="pastor">Pastor</SelectItem>
+                            <SelectItem value="elder">Elder</SelectItem>
+                            <SelectItem value="finance_officer">Finance Officer</SelectItem>
+                            <SelectItem value="member">Member</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="phone">Primary Phone</Label>
+                        <Input
+                          id="phone"
+                          value={editForm.phone}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="email">Email</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={editForm.email}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="address">Address</Label>
+                        <Input
+                          id="address"
+                          value={editForm.address}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, address: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="occupation">Occupation</Label>
+                        <Input
+                          id="occupation"
+                          value={editForm.occupation}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, occupation: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="place_of_work">Place of Work</Label>
+                        <Input
+                          id="place_of_work"
+                          value={editForm.place_of_work}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, place_of_work: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="marital_status">Marital Status</Label>
+                        <Select value={editForm.marital_status} onValueChange={(value) => setEditForm(prev => ({ ...prev, marital_status: value }))}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="single">Single</SelectItem>
+                            <SelectItem value="married">Married</SelectItem>
+                            <SelectItem value="divorced">Divorced</SelectItem>
+                            <SelectItem value="widowed">Widowed</SelectItem>
+                            <SelectItem value="separated">Separated</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="spouse_name">Spouse Name</Label>
+                        <Input
+                          id="spouse_name"
+                          value={editForm.spouse_name}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, spouse_name: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="children_count">Children Count</Label>
+                        <Input
+                          id="children_count"
+                          type="number"
+                          value={editForm.children_count}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, children_count: parseInt(e.target.value) || 0 }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="border-t pt-4">
+                      <h4 className="font-medium text-gray-900 mb-3">Emergency Contact</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <Label htmlFor="emergency_contact_name">Contact Name</Label>
+                          <Input
+                            id="emergency_contact_name"
+                            value={editForm.emergency_contact_name}
+                            onChange={(e) => setEditForm(prev => ({ ...prev, emergency_contact_name: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="emergency_contact_phone">Contact Phone</Label>
+                          <Input
+                            id="emergency_contact_phone"
+                            value={editForm.emergency_contact_phone}
+                            onChange={(e) => setEditForm(prev => ({ ...prev, emergency_contact_phone: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="emergency_contact_relation">Relationship</Label>
+                          <Input
+                            id="emergency_contact_relation"
+                            value={editForm.emergency_contact_relation}
+                            onChange={(e) => setEditForm(prev => ({ ...prev, emergency_contact_relation: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Secondary Phone</label>
-                    <p className="text-gray-900">{member.user?.secondary_phone || 'Not provided'}</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Primary Phone</label>
+                      <p className="text-gray-900">{member.user?.phone || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Secondary Phone</label>
+                      <p className="text-gray-900">{member.user?.secondary_phone || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Email</label>
+                      <p className="text-gray-900">{member.user?.email || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Address</label>
+                      <p className="text-gray-900">{member.address || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Emergency Contact</label>
+                      <p className="text-gray-900">
+                        {member.user?.emergency_contact_name 
+                          ? `${member.user.emergency_contact_name} (${member.user.emergency_contact_relation}) - ${member.user.emergency_contact_phone}`
+                          : 'Not provided'
+                        }
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Email</label>
-                    <p className="text-gray-900">{member.user?.email || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Address</label>
-                    <p className="text-gray-900">{member.address || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Emergency Contact</label>
-                    <p className="text-gray-900">
-                      {member.user?.emergency_contact_name 
-                        ? `${member.user.emergency_contact_name} (${member.user.emergency_contact_relation}) - ${member.user.emergency_contact_phone}`
-                        : 'Not provided'
-                      }
-                    </p>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
 
@@ -497,8 +778,8 @@ export default function MemberProfilePage() {
                     {member.group_memberships.map((membership) => (
                       <div key={membership.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                         <div>
-                          <p className="font-medium text-gray-900">{membership.group.name}</p>
-                          <p className="text-sm text-gray-500 capitalize">{membership.group.group_type}</p>
+                          <p className="font-medium text-gray-900">{membership.group?.name || 'Unknown Group'}</p>
+                          <p className="text-sm text-gray-500 capitalize">{membership.group?.group_type || 'Unknown Type'}</p>
                         </div>
                         <Badge variant="outline">{membership.role}</Badge>
                       </div>

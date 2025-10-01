@@ -278,7 +278,7 @@ export function Sidebar({ className }: SidebarProps) {
       )}
 
       {/* Main Navigation */}
-      <nav className="flex-1 px-4 py-4 space-y-6 overflow-y-auto">
+      <nav className="flex-1 px-4 py-4 space-y-6 overflow-y-auto overscroll-contain">
         {navigationSections.map((section) => (
           <div key={section.title} className="space-y-2">
             {!collapsed && (
@@ -419,7 +419,7 @@ export function MobileSidebar() {
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setOpen(false)} />
-          <div className="fixed inset-y-0 left-0 w-72 bg-blue-900 shadow-xl">
+          <div className="fixed inset-y-0 left-0 w-72 bg-blue-900 shadow-xl flex flex-col h-full">
             <div className="flex items-center justify-between p-6 border-b border-blue-800">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center">
@@ -461,7 +461,7 @@ export function MobileSidebar() {
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 px-4 py-4 space-y-6 overflow-y-auto">
+            <nav className="flex-1 px-4 py-4 space-y-6 overflow-y-auto overscroll-contain">
               {navigationSections.map((section) => (
                 <div key={section.title} className="space-y-2">
                   <h3 className="text-xs font-semibold text-blue-200 uppercase tracking-wider px-3">

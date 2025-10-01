@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/providers'
 import { DashboardLayout } from '@/components/dashboard-layout'
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Badge } from '@/components/ui/badge'
 import { LoadingSpinner } from '@/components/ui/loading'
 import { ErrorDisplay } from '@/components/ui/error-display'
 import { 
@@ -21,7 +22,17 @@ import {
   Clock,
   User,
   UserCheck,
-  AlertCircle
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  X,
+  Phone,
+  Mail,
+  Hash,
+  UserPlus,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/use-toast'
@@ -33,6 +44,8 @@ interface Member {
   membership_id: string
   phone?: string
   email?: string
+  role?: string
+  status?: string
   dependants?: Array<{
     id: string
     relationship: string
@@ -50,14 +63,19 @@ interface BulkCheckInResult {
 export default function BulkAttendancePage() {
   const { user, loading: authLoading } = useAuth()
   const [members, setMembers] = useState<Member[]>([])
-  const [filteredMembers, setFilteredMembers] = useState<Member[]>([])
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set())
   const [selectedDependants, setSelectedDependants] = useState<Map<string, string[]>>(new Map())
   const [searchTerm, setSearchTerm] = useState('')
+  const [searchType, setSearchType] = useState<'all' | 'name' | 'id' | 'phone' | 'email'>('all')
   const [serviceType, setServiceType] = useState('sunday_service')
   const [loading, setLoading] = useState(false)
   const [bulkResult, setBulkResult] = useState<BulkCheckInResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(20)
+  const [showFilters, setShowFilters] = useState(false)
+  const [roleFilter, setRoleFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
   const router = useRouter()
   const supabase = createClient()
   const { toast } = useToast()
@@ -77,18 +95,58 @@ export default function BulkAttendancePage() {
     }
   }, [user])
 
-  useEffect(() => {
-    if (searchTerm) {
-      const filtered = members.filter(member =>
-        member.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.membership_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (member.phone && member.phone.includes(searchTerm))
-      )
-      setFilteredMembers(filtered)
-    } else {
-      setFilteredMembers(members)
+  // Enhanced search and filtering logic
+  const filteredMembers = useMemo(() => {
+    let filtered = members
+
+    // Apply search filter
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase().trim()
+      filtered = filtered.filter(member => {
+        switch (searchType) {
+          case 'name':
+            return member.full_name.toLowerCase().includes(searchLower)
+          case 'id':
+            return member.membership_id.toLowerCase().includes(searchLower)
+          case 'phone':
+            return member.phone?.includes(searchTerm) || false
+          case 'email':
+            return member.email?.toLowerCase().includes(searchLower) || false
+          case 'all':
+          default:
+            return (
+              member.full_name.toLowerCase().includes(searchLower) ||
+              member.membership_id.toLowerCase().includes(searchLower) ||
+              member.phone?.includes(searchTerm) ||
+              member.email?.toLowerCase().includes(searchLower)
+            )
+        }
+      })
     }
-  }, [searchTerm, members])
+
+    // Apply role filter
+    if (roleFilter !== 'all') {
+      filtered = filtered.filter(member => member.role === roleFilter)
+    }
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(member => member.status === statusFilter)
+    }
+
+    return filtered
+  }, [members, searchTerm, searchType, roleFilter, statusFilter])
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredMembers.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedMembers = filteredMembers.slice(startIndex, endIndex)
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, searchType, roleFilter, statusFilter])
 
   const fetchMembers = async () => {
     try {
@@ -100,12 +158,14 @@ export default function BulkAttendancePage() {
         .from('members')
         .select(`
           id,
+          status,
           user:app_users(
             id,
             full_name,
             membership_id,
             phone,
-            email
+            email,
+            role
           ),
           dependants(id, relationship)
         `)
@@ -123,11 +183,12 @@ export default function BulkAttendancePage() {
           membership_id: member.user[0]?.membership_id,
           phone: member.user[0]?.phone,
           email: member.user[0]?.email,
+          role: member.user[0]?.role,
+          status: member.status,
           dependants: member.dependants || []
         }))
 
       setMembers(transformedMembers)
-      setFilteredMembers(transformedMembers)
     } catch (err) {
       console.error('Error fetching members:', err)
       setError('Failed to load members')
@@ -169,14 +230,27 @@ export default function BulkAttendancePage() {
   }
 
   const handleSelectAll = () => {
-    if (selectedMembers.size === filteredMembers.length) {
-      // Deselect all
-      setSelectedMembers(new Set())
-      setSelectedDependants(new Map())
+    const currentPageMemberIds = new Set(paginatedMembers.map(m => m.id))
+    const allCurrentPageSelected = paginatedMembers.every(member => selectedMembers.has(member.id))
+    
+    if (allCurrentPageSelected) {
+      // Deselect all on current page
+      const newSelected = new Set(selectedMembers)
+      paginatedMembers.forEach(member => {
+        newSelected.delete(member.id)
+        // Also remove dependants for this member
+        const newDependants = new Map(selectedDependants)
+        newDependants.delete(member.id)
+        setSelectedDependants(newDependants)
+      })
+      setSelectedMembers(newSelected)
     } else {
-      // Select all
-      const allMemberIds = new Set(filteredMembers.map(m => m.id))
-      setSelectedMembers(allMemberIds)
+      // Select all on current page
+      const newSelected = new Set(selectedMembers)
+      paginatedMembers.forEach(member => {
+        newSelected.add(member.id)
+      })
+      setSelectedMembers(newSelected)
     }
   }
 
@@ -294,6 +368,33 @@ export default function BulkAttendancePage() {
       total += dependantIds.length
     })
     return total
+  }
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+
+  const handleItemsPerPageChange = (items: number) => {
+    setItemsPerPage(items)
+    setCurrentPage(1)
+  }
+
+  const clearFilters = () => {
+    setSearchTerm('')
+    setSearchType('all')
+    setRoleFilter('all')
+    setStatusFilter('all')
+    setCurrentPage(1)
+  }
+
+  const getSearchTypeIcon = (type: string) => {
+    switch (type) {
+      case 'name': return <User className="h-4 w-4" />
+      case 'id': return <Hash className="h-4 w-4" />
+      case 'phone': return <Phone className="h-4 w-4" />
+      case 'email': return <Mail className="h-4 w-4" />
+      default: return <Search className="h-4 w-4" />
+    }
   }
 
   if (authLoading) {
@@ -423,7 +524,7 @@ export default function BulkAttendancePage() {
           </Card>
         ) : (
           <div className="space-y-6">
-            {/* Search and Controls */}
+            {/* Enhanced Search and Controls */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
@@ -440,28 +541,131 @@ export default function BulkAttendancePage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center space-x-4">
+                {/* Search Bar */}
+                <div className="flex flex-col sm:flex-row gap-4">
                   <div className="flex-1">
                     <Label htmlFor="search">Search Members</Label>
                     <div className="relative mt-1">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      {getSearchTypeIcon(searchType)}
                       <Input
                         id="search"
-                        placeholder="Search by name, membership ID, or phone..."
+                        placeholder={`Search by ${searchType === 'all' ? 'name, ID, phone, or email' : searchType}...`}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="pl-10"
                       />
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="sm:w-48">
+                    <Label htmlFor="search-type">Search Type</Label>
+                    <Select value={searchType} onValueChange={(value: any) => setSearchType(value)}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Fields</SelectItem>
+                        <SelectItem value="name">Name Only</SelectItem>
+                        <SelectItem value="id">ID Only</SelectItem>
+                        <SelectItem value="phone">Phone Only</SelectItem>
+                        <SelectItem value="email">Email Only</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Filters */}
+                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowFilters(!showFilters)}
+                    className="w-full sm:w-auto"
+                  >
+                    <Filter className="h-4 w-4 mr-2" />
+                    Filters
+                    {showFilters ? <ChevronUp className="h-4 w-4 ml-2" /> : <ChevronDown className="h-4 w-4 ml-2" />}
+                  </Button>
+                  
+                  {(searchTerm || roleFilter !== 'all' || statusFilter !== 'all') && (
+                    <Button
+                      variant="ghost"
+                      onClick={clearFilters}
+                      className="w-full sm:w-auto"
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Clear Filters
+                    </Button>
+                  )}
+
+                  <div className="flex-1 flex justify-end">
                     <Button
                       variant="outline"
                       onClick={handleSelectAll}
                       size="sm"
                     >
-                      {selectedMembers.size === filteredMembers.length ? 'Deselect All' : 'Select All'}
+                      {paginatedMembers.every(member => selectedMembers.has(member.id)) ? 'Deselect Page' : 'Select Page'}
                     </Button>
+                  </div>
+                </div>
+
+                {/* Advanced Filters */}
+                {showFilters && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                    <div>
+                      <Label htmlFor="role-filter">Role Filter</Label>
+                      <Select value={roleFilter} onValueChange={setRoleFilter}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Roles</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="pastor">Pastor</SelectItem>
+                          <SelectItem value="elder">Elder</SelectItem>
+                          <SelectItem value="finance_officer">Finance Officer</SelectItem>
+                          <SelectItem value="member">Member</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="status-filter">Status Filter</Label>
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Status</SelectItem>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                          <SelectItem value="visitor">Visitor</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+
+                {/* Results Summary */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-sm text-gray-600">
+                  <div>
+                    Showing {startIndex + 1}-{Math.min(endIndex, filteredMembers.length)} of {filteredMembers.length} members
+                    {searchTerm && (
+                      <span className="ml-2 text-blue-600">
+                        (filtered by "{searchTerm}")
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="items-per-page" className="text-xs">Per page:</Label>
+                    <Select value={itemsPerPage.toString()} onValueChange={(value) => handleItemsPerPageChange(parseInt(value))}>
+                      <SelectTrigger className="w-20 h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </CardContent>
@@ -480,7 +684,7 @@ export default function BulkAttendancePage() {
                   <div className="flex items-center justify-center py-8">
                     <LoadingSpinner />
                   </div>
-                ) : filteredMembers.length === 0 ? (
+                ) : paginatedMembers.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
                     <User className="h-8 w-8 mx-auto mb-2 opacity-50" />
                     <p>No members found</p>
@@ -489,8 +693,8 @@ export default function BulkAttendancePage() {
                     )}
                   </div>
                 ) : (
-                  <div className="space-y-4 max-h-96 overflow-y-auto">
-                    {filteredMembers.map((member) => {
+                  <div className="space-y-4">
+                    {paginatedMembers.map((member) => {
                       const isSelected = selectedMembers.has(member.id)
                       const memberDependants = selectedDependants.get(member.id) || []
                       
@@ -511,16 +715,43 @@ export default function BulkAttendancePage() {
                             />
                             <div className="flex-1">
                               <div className="flex items-center justify-between">
-                                <div>
-                                  <h3 className="font-medium text-gray-900">
-                                    {member.full_name}
-                                  </h3>
-                                  <p className="text-sm text-gray-600">
-                                    {formatMembershipIdForDisplay(member.membership_id)}
-                                  </p>
-                                  {member.phone && (
-                                    <p className="text-sm text-gray-500">{member.phone}</p>
-                                  )}
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <h3 className="font-medium text-gray-900">
+                                      {member.full_name}
+                                    </h3>
+                                    {member.role && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        {member.role}
+                                      </Badge>
+                                    )}
+                                    {member.status && (
+                                      <Badge 
+                                        variant={member.status === 'active' ? 'default' : 'outline'} 
+                                        className="text-xs"
+                                      >
+                                        {member.status}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-4 text-sm text-gray-600">
+                                    <span className="flex items-center">
+                                      <Hash className="h-3 w-3 mr-1" />
+                                      {formatMembershipIdForDisplay(member.membership_id)}
+                                    </span>
+                                    {member.phone && (
+                                      <span className="flex items-center">
+                                        <Phone className="h-3 w-3 mr-1" />
+                                        {member.phone}
+                                      </span>
+                                    )}
+                                    {member.email && (
+                                      <span className="flex items-center">
+                                        <Mail className="h-3 w-3 mr-1" />
+                                        {member.email}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                                 {isSelected && (
                                   <div className="flex items-center text-blue-600">
@@ -560,6 +791,64 @@ export default function BulkAttendancePage() {
                         </div>
                       )
                     })}
+                  </div>
+                )}
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+                    <div className="text-sm text-gray-600">
+                      Page {currentPage} of {totalPages}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        Previous
+                      </Button>
+                      
+                      {/* Page Numbers */}
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                          let pageNum;
+                          if (totalPages <= 5) {
+                            pageNum = i + 1;
+                          } else if (currentPage <= 3) {
+                            pageNum = i + 1;
+                          } else if (currentPage >= totalPages - 2) {
+                            pageNum = totalPages - 4 + i;
+                          } else {
+                            pageNum = currentPage - 2 + i;
+                          }
+                          
+                          return (
+                            <Button
+                              key={pageNum}
+                              variant={currentPage === pageNum ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => handlePageChange(pageNum)}
+                              className="w-8 h-8 p-0"
+                            >
+                              {pageNum}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                      >
+                        Next
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>
