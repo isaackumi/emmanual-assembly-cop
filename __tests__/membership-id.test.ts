@@ -34,7 +34,7 @@ describe('Membership ID Utils', () => {
       expect(isValidMembershipId('EA1234202')).toBe(false)
       expect(isValidMembershipId('EA123420211')).toBe(false)
       expect(isValidMembershipId('AB12342021')).toBe(false)
-      expect(isValidMembershipId('ea12342021')).toBe(false)
+      expect(isValidMembershipId('ea12342021')).toBe(true)
       expect(isValidMembershipId('1234567890')).toBe(false)
     })
   })

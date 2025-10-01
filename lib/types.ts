@@ -166,10 +166,82 @@ export interface Attendance {
   client_uuid?: string
   created_by?: string
   created_at: string
+  // Enhanced fields
+  is_duplicate?: boolean
+  departments?: string[]
+  age_category?: 'adult' | 'child'
+  gender?: 'male' | 'female'
+  status?: 'present' | 'absent' | 'late'
+  notes?: string
   // Joined data
   member?: Member
   dependant?: Dependant
   creator?: AppUser
+}
+
+export interface Department {
+  id: string
+  name: string
+  description?: string
+  department_type: 'ministry' | 'service' | 'fellowship' | 'leadership' | 'support'
+  leader_id?: string
+  co_leader_id?: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  // Joined data
+  leader?: AppUser
+  co_leader?: AppUser
+  members?: DepartmentMembership[]
+}
+
+export interface DepartmentMembership {
+  id: string
+  department_id: string
+  member_id: string
+  role: 'leader' | 'co_leader' | 'member' | 'volunteer'
+  joined_date: string
+  is_active: boolean
+  notes?: string
+  created_at: string
+  // Joined data
+  department?: Department
+  member?: Member
+}
+
+export interface AbsenteeRecord {
+  id: string
+  member_id: string
+  service_date: string
+  service_type: string
+  reason?: string
+  follow_up_required: boolean
+  follow_up_notes?: string
+  follow_up_completed: boolean
+  follow_up_date?: string
+  follow_up_by?: string
+  sms_sent: boolean
+  sms_sent_at?: string
+  created_at: string
+  updated_at: string
+  // Joined data
+  member?: Member
+  follow_up_user?: AppUser
+}
+
+export interface AttendanceActivity {
+  id: string
+  type: 'check_in' | 'check_out' | 'bulk_attendance' | 'absentee_marked' | 'follow_up'
+  member_id?: string
+  service_date: string
+  service_type: string
+  description: string
+  metadata?: Record<string, any>
+  created_by: string
+  created_at: string
+  // Joined data
+  member?: Member
+  created_user?: AppUser
 }
 
 export interface Donation {
@@ -495,6 +567,12 @@ export interface DashboardStats {
   recent_visitors: number
   attendance_rate: number
   visitor_conversion_rate: number
+  // Enhanced attendance analytics
+  male_attendance?: number
+  female_attendance?: number
+  adult_attendance?: number
+  children_attendance?: number
+  total_attendance?: number
 }
 
 export interface Demographics {

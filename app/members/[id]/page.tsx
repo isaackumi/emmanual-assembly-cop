@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
-import { createClient } from '@/lib/supabase/client'
+import { dataService } from '@/lib/services/data-service'
+import { useQuery } from '@tanstack/react-query'
 import { Member, AppUser, Dependant, GroupMembership, Attendance } from '@/lib/types'
 import { formatDate } from '@/lib/utils'
 import { calculateProfileCompletion, getCompletionColor, getCompletionMessage, getNextSteps } from '@/lib/profile-completion'
@@ -42,7 +43,6 @@ export default function MemberProfilePage() {
   const router = useRouter()
   const params = useParams()
   const { toast } = useToast()
-  const supabase = createClient()
 
   const [member, setMember] = useState<MemberWithDetails | null>(null)
   const [attendanceHistory, setAttendanceHistory] = useState<Attendance[]>([])
@@ -54,64 +54,27 @@ export default function MemberProfilePage() {
     }
   }, [user, authLoading, router])
 
+  const memberQuery = useQuery({
+    queryKey: ['member-profile', params.id],
+    queryFn: async () => dataService.getMember(params.id as string),
+    enabled: Boolean(user && params.id),
+    staleTime: 30_000
+  })
+
+  const attendanceQuery = useQuery({
+    queryKey: ['member-attendance', params.id],
+    queryFn: async () => dataService.getAttendanceByMember(params.id as string, 50),
+    enabled: Boolean(user && params.id),
+    staleTime: 30_000
+  })
+
   useEffect(() => {
-    if (user && params.id) {
-      fetchMember()
-      fetchAttendanceHistory()
-    }
-  }, [user, params.id])
+    if (memberQuery.data?.data) setMember(memberQuery.data.data as unknown as MemberWithDetails)
+  }, [memberQuery.data])
 
-  const fetchMember = async () => {
-    try {
-      setLoading(true)
-      
-      // Fetch member with all related data
-      const { data: memberData, error: memberError } = await supabase
-        .from('members')
-        .select(`
-          *,
-          user:app_users(*),
-          dependants(*),
-          group_memberships:group_members(
-            *,
-            group:groups(name, group_type)
-          )
-        `)
-        .eq('id', params.id)
-        .single()
-
-      if (memberError) {
-        console.error('Error fetching member:', memberError)
-        throw memberError
-      }
-
-      setMember(memberData)
-    } catch (error) {
-      console.error('Error fetching member:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchAttendanceHistory = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('attendance')
-        .select('*')
-        .eq('member_id', params.id)
-        .order('service_date', { ascending: false })
-        .limit(50)
-
-      if (error) {
-        console.error('Error fetching attendance history:', error)
-        return
-      }
-
-      setAttendanceHistory(data || [])
-    } catch (error) {
-      console.error('Error fetching attendance history:', error)
-    }
-  }
+  useEffect(() => {
+    if (attendanceQuery.data?.data) setAttendanceHistory(attendanceQuery.data.data as Attendance[])
+  }, [attendanceQuery.data])
 
   // Calculate profile completion using frontend logic
   const profileCompletion = member ? calculateProfileCompletion(member.user!, member) : null
@@ -138,7 +101,7 @@ export default function MemberProfilePage() {
     }
   }
 
-  if (authLoading || loading) {
+  if (authLoading || memberQuery.isLoading || memberQuery.isFetching) {
     return (
       <div className="min-h-screen bg-gray-50 p-8 flex items-center justify-center">
         <div className="animate-pulse text-blue-600 text-lg">Loading...</div>

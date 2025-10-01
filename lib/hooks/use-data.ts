@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useQuery, useInfiniteQuery, keepPreviousData } from '@tanstack/react-query'
 import { dataService, ApiResponse, PaginatedResponse } from '@/lib/services/data-service'
 import { AppUser, Member, Group, GroupMembership, Attendance, Visitor, DashboardStats } from '@/lib/types'
 
@@ -135,16 +136,44 @@ export function useUpcomingEvents() {
 
 // Members hooks
 export function useMembers(page: number = 1, limit: number = 20, search: string = '') {
-  return usePaginatedData(
-    (pageNum, pageLimit, searchTerm) => dataService.getMembers(pageNum, pageLimit, searchTerm),
-    page,
-    limit,
-    search
-  )
+  const query = useQuery({
+    queryKey: ['members', page, limit, search],
+    queryFn: async () => dataService.getMembers(page, limit, search),
+    placeholderData: keepPreviousData,
+    staleTime: 30_000
+  })
+
+  const data = query.data?.data ?? []
+  const total = query.data?.total ?? 0
+  const hasMore = page * limit < total
+
+  return {
+    data,
+    total,
+    hasMore,
+    error: query.data?.error ?? (query.error ? (query.error as Error).message : null),
+    loading: query.isLoading || query.isFetching,
+    refetch: () => query.refetch(),
+    loadMore: () => {},
+    search: () => {},
+    filter: () => {}
+  }
 }
 
 export function useMember(id: string) {
-  return useApiData(() => dataService.getMember(id), [id])
+  const query = useQuery({
+    queryKey: ['member', id],
+    queryFn: async () => dataService.getMember(id),
+    enabled: Boolean(id),
+    staleTime: 30_000
+  })
+
+  return {
+    data: query.data?.data ?? null,
+    error: query.data?.error ?? (query.error ? (query.error as Error).message : null),
+    loading: query.isLoading || query.isFetching,
+    refetch: () => query.refetch()
+  }
 }
 
 export function useCreateMember() {
@@ -405,6 +434,50 @@ export function useCreateVisitor() {
   }, [])
 
   return { createVisitor, loading, error }
+}
+
+// Attendance hooks
+export function useAttendanceRecordsQuery(filters: {
+  dateFilter?: string
+  serviceFilter?: string
+  limit?: number
+} = {}) {
+  return useQuery({
+    queryKey: ['attendance-records', filters],
+    queryFn: async () => {
+      const result = await dataService.getAttendanceRecords(filters)
+      if (result.error) throw new Error(result.error)
+      return result.data
+    },
+    staleTime: 30_000,
+  })
+}
+
+export function useAttendanceStatsQuery() {
+  return useQuery({
+    queryKey: ['attendance-stats'],
+    queryFn: async () => {
+      const result = await dataService.getAttendanceStats()
+      if (result.error) throw new Error(result.error)
+      return result.data
+    },
+    staleTime: 60_000,
+  })
+}
+
+export function useAttendanceAnalyticsQuery(filters: {
+  timeRange?: string
+  serviceType?: string
+} = {}) {
+  return useQuery({
+    queryKey: ['attendance-analytics', filters],
+    queryFn: async () => {
+      const result = await dataService.getAttendanceAnalytics(filters)
+      if (result.error) throw new Error(result.error)
+      return result.data
+    },
+    staleTime: 60_000,
+  })
 }
 
 // Utility hooks

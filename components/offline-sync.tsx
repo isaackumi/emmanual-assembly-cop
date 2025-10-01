@@ -112,7 +112,7 @@ export function OfflineSync() {
   const addToOfflineQueue = (item: Omit<OfflineQueueItem, 'id' | 'timestamp' | 'retries'>) => {
     const newItem: OfflineQueueItem = {
       ...item,
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `offline-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       timestamp: new Date(),
       retries: 0
     }

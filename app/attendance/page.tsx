@@ -26,7 +26,8 @@ import {
   Filter,
   Search
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { useAttendanceRecordsQuery, useAttendanceStatsQuery } from '@/lib/hooks/use-data'
+import { dataService } from '@/lib/services/data-service'
 import { formatDateTime, formatMembershipIdForDisplay } from '@/lib/utils'
 
 interface AttendanceRecord {
@@ -53,15 +54,21 @@ interface AttendanceStats {
 
 export default function AttendancePage() {
   const { user, loading: authLoading } = useAuth()
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
-  const [stats, setStats] = useState<AttendanceStats | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [serviceFilter, setServiceFilter] = useState('all')
   const [dateFilter, setDateFilter] = useState('today')
   const router = useRouter()
-  const supabase = createClient()
+
+  const { data: attendance, isLoading: attendanceLoading, error: attendanceError } = useAttendanceRecordsQuery({
+    dateFilter,
+    serviceFilter,
+    limit: 100
+  })
+
+  const { data: stats, isLoading: statsLoading, error: statsError } = useAttendanceStatsQuery()
+
+  const loading = attendanceLoading || statsLoading
+  const error = attendanceError || statsError
 
   const serviceTypes = [
     { value: 'all', label: 'All Services' },
@@ -80,116 +87,13 @@ export default function AttendancePage() {
     { value: 'all', label: 'All Time' }
   ]
 
-  useEffect(() => {
-    if (user) {
-      fetchAttendance()
-      fetchStats()
-    }
-  }, [user, serviceFilter, dateFilter])
-
-  const fetchAttendance = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      let query = supabase
-        .from('attendance')
-        .select(`
-          id,
-          member_id,
-          service_date,
-          service_type,
-          check_in_time,
-          status,
-          member:app_users(full_name, membership_id)
-        `)
-        .eq('status', 'present')
-        .order('check_in_time', { ascending: false })
-
-      // Apply date filter
-      const now = new Date()
-      switch (dateFilter) {
-        case 'today':
-          const today = now.toISOString().split('T')[0]
-          query = query.eq('service_date', today)
-          break
-        case 'week':
-          const weekStart = new Date(now.setDate(now.getDate() - now.getDay()))
-          query = query.gte('service_date', weekStart.toISOString().split('T')[0])
-          break
-        case 'month':
-          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-          query = query.gte('service_date', monthStart.toISOString().split('T')[0])
-          break
-      }
-
-      // Apply service filter
-      if (serviceFilter !== 'all') {
-        const serviceLabel = serviceTypes.find(s => s.value === serviceFilter)?.label
-        if (serviceLabel) {
-          query = query.eq('service_type', serviceLabel)
-        }
-      }
-
-      const { data, error } = await query.limit(100)
-
-      if (error) throw error
-
-      // Transform the data to match the interface
-      const transformedData = (data || []).map(record => ({
-        ...record,
-        member: Array.isArray(record.member) && record.member.length > 0 
-          ? record.member[0] 
-          : { full_name: 'Unknown', membership_id: 'N/A' }
-      }))
-
-      setAttendance(transformedData)
-    } catch (err) {
-      console.error('Error fetching attendance:', err)
-      setError('Failed to load attendance data')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchStats = async () => {
-    try {
-      const now = new Date()
-      const today = now.toISOString().split('T')[0]
-      const weekStart = new Date(now.setDate(now.getDate() - now.getDay())).toISOString().split('T')[0]
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-
-      const [
-        { data: totalData },
-        { data: todayData },
-        { data: weekData },
-        { data: monthData }
-      ] = await Promise.all([
-        supabase.from('attendance').select('*').eq('status', 'present'),
-        supabase.from('attendance').select('*').eq('status', 'present').eq('service_date', today),
-        supabase.from('attendance').select('*').eq('status', 'present').gte('service_date', weekStart),
-        supabase.from('attendance').select('*').eq('status', 'present').gte('service_date', monthStart)
-      ])
-
-      const stats: AttendanceStats = {
-        total_attendance: totalData?.length || 0,
-        today_attendance: todayData?.length || 0,
-        weekly_attendance: weekData?.length || 0,
-        monthly_attendance: monthData?.length || 0,
-        attendance_trend: 0, // TODO: Calculate trend
-        popular_service: 'Sunday Service' // TODO: Calculate from data
-      }
-
-      setStats(stats)
-    } catch (err) {
-      console.error('Error fetching stats:', err)
-    }
-  }
-
-  const filteredAttendance = attendance.filter(record =>
-    record.member.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.member.membership_id.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  // Filter attendance based on search term
+  const filteredAttendance = attendance?.filter(record => {
+    if (!searchTerm) return true
+    const member = record.member
+    return member?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           member?.membership_id?.toLowerCase().includes(searchTerm.toLowerCase())
+  }) || []
 
   const exportAttendance = () => {
     const csvContent = [
@@ -254,7 +158,7 @@ export default function AttendancePage() {
 
         {error && (
           <div className="mb-6">
-            <ErrorDisplay error={error} onRetry={fetchAttendance} />
+            <ErrorDisplay error={error instanceof Error ? error.message : String(error)} onRetry={() => window.location.reload()} />
           </div>
         )}
 
@@ -478,7 +382,7 @@ export default function AttendancePage() {
                 <CardDescription>Access attendance tools and features</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                   <Button 
                     variant="outline" 
                     onClick={() => router.push('/attendance/scanner')}
@@ -510,6 +414,14 @@ export default function AttendancePage() {
                   >
                     <Users className="h-6 w-6" />
                     <span>Bulk Attendance</span>
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => router.push('/attendance/comprehensive')}
+                    className="h-24 flex-col space-y-2"
+                  >
+                    <BarChart3 className="h-6 w-6" />
+                    <span>Comprehensive</span>
                   </Button>
                 </div>
               </CardContent>

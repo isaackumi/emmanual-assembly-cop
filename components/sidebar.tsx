@@ -35,7 +35,8 @@ import {
   Zap,
   Target,
   TrendingUp,
-  Gift
+  Gift,
+  Cake
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -100,6 +101,26 @@ const navigationSections = [
             name: 'Bulk Attendance',
             href: '/attendance/bulk',
             icon: Users
+          },
+          {
+            name: 'Attendance Analytics',
+            href: '/attendance/analytics',
+            icon: BarChart3
+          }
+        ]
+      },
+      {
+        title: 'COMMUNICATIONS',
+        items: [
+          {
+            name: 'SMS Management',
+            href: '/sms',
+            icon: MessageSquare
+          },
+          {
+            name: 'Birthdays & Anniversaries',
+            href: '/celebrations',
+            icon: Cake
           }
         ]
       },

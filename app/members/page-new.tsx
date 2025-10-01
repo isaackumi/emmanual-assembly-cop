@@ -52,23 +52,21 @@ function MembersContent() {
     error, 
     loading, 
     refetch, 
-    loadMore, 
-    search, 
-    filter 
+    loadMore
   } = useMembers(currentPage, 20, searchTerm)
 
   // Handle search
   const handleSearch = (term: string) => {
     setSearchTerm(term)
     setCurrentPage(1)
-    search(term)
+    // Search is handled automatically by the useMembers hook
   }
 
   // Handle filter
   const handleFilter = (type: string) => {
     setFilterType(type)
     setCurrentPage(1)
-    filter(type === 'all' ? '' : type)
+    // Filter is handled automatically by the useMembers hook
   }
 
   // Copy membership ID to clipboard

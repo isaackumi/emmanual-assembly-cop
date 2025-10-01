@@ -41,7 +41,7 @@ export function usePWA() {
   // Handle before install prompt
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault()
+      // Don't prevent default - let the browser handle it naturally
       const promptEvent = e as BeforeInstallPromptEvent
       setDeferredPrompt(promptEvent)
       setPwaState(prev => ({ ...prev, canInstall: true }))

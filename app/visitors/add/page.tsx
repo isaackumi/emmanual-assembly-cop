@@ -10,8 +10,9 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
-import { createClient } from '@/lib/supabase/client'
+import { dataService } from '@/lib/services/data-service'
 import { CreateVisitorForm } from '@/lib/types'
+import { useClientOnly } from '@/lib/hooks/use-client-only'
 import { DashboardLayout } from '@/components/dashboard-layout'
 import { 
   ArrowLeft, 
@@ -29,7 +30,6 @@ export default function AddVisitorPage() {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
-  const supabase = createClient()
 
   const [formData, setFormData] = useState<CreateVisitorForm>({
     first_name: '',
@@ -37,10 +37,10 @@ export default function AddVisitorPage() {
     phone: '',
     email: '',
     address: '',
-    visit_date: new Date().toISOString().split('T')[0], // Today's date
+    visit_date: '', // Will be set after mount
     service_attended: '',
     how_heard_about_church: '',
-    invited_by_member_id: '',
+    invited_by_member_id: 'none',
     follow_up_notes: '',
     follow_up_date: ''
   })
@@ -53,6 +53,18 @@ export default function AddVisitorPage() {
     }
   }, [user, authLoading, router])
 
+  const isMounted = useClientOnly()
+
+  // Set today's date after mount to prevent hydration mismatch
+  useEffect(() => {
+    if (isMounted && formData.visit_date === '') {
+      setFormData(prev => ({
+        ...prev,
+        visit_date: new Date().toISOString().split('T')[0]
+      }))
+    }
+  }, [isMounted, formData.visit_date])
+
   useEffect(() => {
     if (user) {
       fetchMembers()
@@ -61,16 +73,8 @@ export default function AddVisitorPage() {
 
   const fetchMembers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('members')
-        .select(`
-          id,
-          user:app_users(full_name, membership_id)
-        `)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
+      const { data, error } = await dataService.getMembers(1, 500)
+      if (error) throw new Error(error)
       setMembers(data || [])
     } catch (error) {
       console.error('Error fetching members:', error)
@@ -91,28 +95,25 @@ export default function AddVisitorPage() {
     setLoading(true)
 
     try {
-      const { data, error } = await supabase
-        .from('visitors')
-        .insert({
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          phone: formData.phone,
-          email: formData.email,
-          address: formData.address,
-          visit_date: formData.visit_date,
-          service_attended: formData.service_attended,
-          how_heard_about_church: formData.how_heard_about_church,
-          invited_by_member_id: formData.invited_by_member_id || null,
-          follow_up_notes: formData.follow_up_notes,
-          follow_up_date: formData.follow_up_date || null,
-          is_active: true,
-          converted_to_member: false,
-          follow_up_completed: false
-        })
-        .select()
-        .single()
+      const payload = {
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        phone: formData.phone,
+        email: formData.email,
+        address: formData.address,
+        visit_date: formData.visit_date,
+        service_attended: formData.service_attended,
+        how_heard_about_church: formData.how_heard_about_church,
+        invited_by_member_id: formData.invited_by_member_id === 'none' ? undefined : formData.invited_by_member_id,
+        follow_up_notes: formData.follow_up_notes,
+        follow_up_date: formData.follow_up_date || undefined,
+        is_active: true,
+        converted_to_member: false,
+        follow_up_completed: false
+      }
 
-      if (error) throw error
+      const { error } = await dataService.createVisitor(payload)
+      if (error) throw new Error(error)
 
       toast({
         title: "Success",
@@ -302,7 +303,7 @@ export default function AddVisitorPage() {
                       <SelectValue placeholder="Select member who invited them" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No one (direct visit)</SelectItem>
+                      <SelectItem value="none">No one (direct visit)</SelectItem>
                       {members.map((member) => (
                         <SelectItem key={member.id} value={member.id}>
                           {member.user?.full_name} ({member.user?.membership_id})

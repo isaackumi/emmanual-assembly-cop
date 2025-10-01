@@ -1,11 +1,6 @@
-const CACHE_NAME = "emmanuel-assembly-v1.0.0";
+const CACHE_NAME = "emmanuel-assembly-v1.0.1";
 const STATIC_CACHE_URLS = [
-  "/",
-  "/dashboard",
-  "/members",
-  "/visitors",
-  "/groups",
-  "/attendance",
+  // Only cache truly static, non-HTML resources here
   "/manifest.json",
   "/offline.html"
 ];
@@ -38,7 +33,6 @@ self.addEventListener("activate", (event) => {
   return self.clients.claim();
 });
 
-// Fetch event - handle requests with proper redirect handling
 self.addEventListener("fetch", (event) => {
   // Skip non-GET requests
   if (event.request.method !== "GET") {
@@ -50,40 +44,34 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // For navigations, let the network/browser handle redirects to avoid
+  // "redirect mode is not 'follow'" errors. Provide offline fallback only.
+  if (event.request.mode === "navigate") {
+    if (!self.navigator.onLine) {
+      event.respondWith(caches.match("/offline.html"));
+    }
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
         return cachedResponse;
       }
 
-      // For navigation requests, handle redirects properly
-      if (event.request.mode === "navigate") {
-        return fetch(event.request, {
-          redirect: "follow" // Explicitly follow redirects
-        }).then((response) => {
-          // If the fetch fails, return offline page
-          if (!response || response.status !== 200 || response.type !== "basic") {
-            return caches.match("/offline.html");
-          }
-          
-          // Cache the successful response
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone);
-          });
-          
-          return response;
-        }).catch(() => {
-          return caches.match("/offline.html");
-        });
-      }
-
       // For other requests, fetch with redirect handling
       return fetch(event.request, {
         redirect: "follow"
       }).then((response) => {
-        // Don't cache non-successful responses
-        if (!response || response.status !== 200 || response.type !== "basic") {
+        // Handle redirect responses
+        if (response.type === "opaqueredirect" || response.status === 302 || response.status === 301) {
+          // Never cache redirects; just pass through
+          return response;
+        }
+        
+        // Don't cache non-successful responses or HTML documents
+        const contentType = response.headers.get("content-type") || "";
+        if (!response || response.status !== 200 || response.type !== "basic" || contentType.includes("text/html")) {
           return response;
         }
 
@@ -94,7 +82,8 @@ self.addEventListener("fetch", (event) => {
         });
 
         return response;
-      }).catch(() => {
+      }).catch((error) => {
+        console.log("Fetch error:", error);
         // For API calls, return a proper error response
         if (event.request.url.includes("/api/")) {
           return new Response(

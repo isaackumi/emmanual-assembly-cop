@@ -1,78 +1,180 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/providers'
 import { useMembers } from '@/lib/hooks/use-data'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { LoadingTable, LoadingStats, LoadingPage } from '@/components/ui/loading'
+import { LoadingSpinner } from '@/components/ui/loading'
 import { ErrorDisplay, EmptyState } from '@/components/ui/error-display'
-import { ErrorBoundary } from '@/components/error-boundary'
 import { DashboardLayout } from '@/components/dashboard-layout'
 import { 
   Users, 
   Search, 
   Plus, 
   Download, 
+  Filter,
   Calendar,
   MapPin,
-  User,
-  ArrowLeft,
-  Settings,
-  Eye,
-  Edit,
-  MoreHorizontal,
-  Crown,
-  Star,
-  Filter,
   Phone,
   Mail,
   Copy,
-  CheckCircle
+  CheckCircle,
+  User,
+  Crown,
+  Star,
+  RefreshCw,
+  X,
+  ChevronDown,
+  SortAsc,
+  SortDesc,
+  Eye,
+  Edit
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { formatMembershipIdForDisplay } from '@/lib/utils'
 
-function MembersContent() {
+interface MemberFilters {
+  search: string
+  role: string
+  status: string
+  joinYear: string
+  sortBy: string
+  sortOrder: 'asc' | 'desc'
+}
+
+export default function MembersPage() {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
   
-  // Data hooks
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterType, setFilterType] = useState('all')
+  // State management
+  const [filters, setFilters] = useState<MemberFilters>({
+    search: '',
+    role: 'all',
+    status: 'all',
+    joinYear: 'all',
+    sortBy: 'name',
+    sortOrder: 'asc'
+  })
   const [currentPage, setCurrentPage] = useState(1)
-  
+  const [showFilters, setShowFilters] = useState(false)
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([])
+
+  // Data fetching with improved error handling
   const { 
     data: members, 
     total, 
     hasMore, 
     error, 
     loading, 
-    refetch, 
-    loadMore, 
-    search, 
-    filter 
-  } = useMembers(currentPage, 20, searchTerm)
+    refetch
+  } = useMembers(currentPage, 50, filters.search)
 
-  // Handle search
-  const handleSearch = (term: string) => {
-    setSearchTerm(term)
+  // Debug logging
+  console.log('Members page state:', { 
+    membersLength: members?.length, 
+    total, 
+    error, 
+    loading,
+    currentPage,
+    searchTerm: filters.search
+  })
+
+  // Filter and sort members client-side for better UX
+  const filteredMembers = useMemo(() => {
+    if (!members) return []
+    
+    let filtered = [...members]
+    
+    // Role filter
+    if (filters.role !== 'all') {
+      filtered = filtered.filter(member => member.user?.role === filters.role)
+    }
+    
+    // Status filter
+    if (filters.status !== 'all') {
+      filtered = filtered.filter(member => member.status === filters.status)
+    }
+    
+    // Join year filter
+    if (filters.joinYear !== 'all') {
+      filtered = filtered.filter(member => member.user?.join_year?.toString() === filters.joinYear)
+    }
+    
+    // Sort
+    filtered.sort((a, b) => {
+      let aValue: any, bValue: any
+      
+      switch (filters.sortBy) {
+        case 'name':
+          aValue = a.user?.full_name || ''
+          bValue = b.user?.full_name || ''
+          break
+        case 'join_date':
+          aValue = new Date(a.user?.created_at || 0)
+          bValue = new Date(b.user?.created_at || 0)
+          break
+        case 'membership_id':
+          aValue = a.user?.membership_id || ''
+          bValue = b.user?.membership_id || ''
+          break
+        default:
+          aValue = a.user?.full_name || ''
+          bValue = b.user?.full_name || ''
+      }
+      
+      if (filters.sortOrder === 'asc') {
+        return aValue > bValue ? 1 : -1
+      } else {
+        return aValue < bValue ? 1 : -1
+      }
+    })
+    
+    return filtered
+  }, [members, filters])
+
+  // Get unique values for filter options
+  const uniqueRoles = useMemo(() => {
+    if (!members) return []
+    const roles = members.map(m => m.user?.role).filter(Boolean)
+    return Array.from(new Set(roles))
+  }, [members])
+
+  const uniqueJoinYears = useMemo(() => {
+    if (!members) return []
+    const years = members.map(m => m.user?.join_year).filter(Boolean) as number[]
+    return Array.from(new Set(years)).sort((a, b) => (b || 0) - (a || 0))
+  }, [members])
+
+  // Handlers
+  const handleFilterChange = (key: keyof MemberFilters, value: string) => {
+    setFilters(prev => ({ ...prev, [key]: value }))
     setCurrentPage(1)
-    search(term)
   }
 
-  // Handle filter
-  const handleFilter = (type: string) => {
-    setFilterType(type)
+  const handleSearch = (value: string) => {
+    setFilters(prev => ({ ...prev, search: value }))
     setCurrentPage(1)
-    filter(type === 'all' ? '' : type)
   }
 
-  // Copy membership ID to clipboard
+  const clearFilters = () => {
+    setFilters({
+      search: '',
+      role: 'all',
+      status: 'all',
+      joinYear: 'all',
+      sortBy: 'name',
+      sortOrder: 'asc'
+    })
+    setCurrentPage(1)
+  }
+
   const copyMembershipId = (membershipId: string) => {
     navigator.clipboard.writeText(membershipId)
     toast({
@@ -81,413 +183,418 @@ function MembersContent() {
     })
   }
 
-  // Show loading state
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case 'admin': return 'bg-red-100 text-red-800'
+      case 'elder': return 'bg-purple-100 text-purple-800'
+      case 'deacon': return 'bg-blue-100 text-blue-800'
+      case 'member': return 'bg-green-100 text-green-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return 'bg-green-100 text-green-800'
+      case 'inactive': return 'bg-gray-100 text-gray-800'
+      case 'transferred': return 'bg-yellow-100 text-yellow-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  // Loading state
   if (authLoading || loading) {
     return (
       <DashboardLayout>
-        <LoadingPage title="Loading Members..." description="Fetching member data..." />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <LoadingSpinner />
+        </div>
       </DashboardLayout>
     )
   }
 
-  // Show error state
+  // Error state
   if (error) {
     return (
       <DashboardLayout>
         <div className="max-w-7xl mx-auto">
           <ErrorDisplay
             error={error}
-            onRetry={refetch}
+            onRetry={() => {
+              console.log('Retrying members fetch...')
+              refetch()
+            }}
             variant="page"
             title="Failed to load members"
           />
+          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <h3 className="text-sm font-medium text-yellow-800">Debug Information</h3>
+            <p className="text-sm text-yellow-700 mt-1">
+              Error: {error}
+            </p>
+            <p className="text-sm text-yellow-700 mt-1">
+              This might be due to database connection issues or missing data.
+            </p>
+          </div>
         </div>
       </DashboardLayout>
     )
   }
 
-  // Show nothing while redirecting
+  // Unauthenticated state
   if (!user) {
-    return null
-  }
-
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'admin': return 'bg-red-100 text-red-800'
-      case 'pastor': return 'bg-purple-100 text-purple-800'
-      case 'elder': return 'bg-blue-100 text-blue-800'
-      case 'finance_officer': return 'bg-green-100 text-green-800'
-      case 'member': return 'bg-gray-100 text-gray-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  const getGenderColor = (gender: string) => {
-    switch (gender) {
-      case 'male': return 'bg-blue-100 text-blue-800'
-      case 'female': return 'bg-pink-100 text-pink-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    })
-  }
-
-  const getAge = (dob: string) => {
-    const today = new Date()
-    const birthDate = new Date(dob)
-    let age = today.getFullYear() - birthDate.getFullYear()
-    const monthDiff = today.getMonth() - birthDate.getMonth()
-    
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--
-    }
-    
-    return age
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Authentication Required</h2>
+            <p className="text-gray-600 mb-4">Please log in to view members.</p>
+            <Button onClick={() => router.push('/auth')}>
+              Go to Login
+            </Button>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
   }
 
   return (
     <DashboardLayout>
-      <div className="max-w-7xl mx-auto">
+      <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="flex items-center mb-2">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => router.push('/dashboard')}
-                className="mr-3 text-gray-600 hover:text-gray-900"
-              >
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back to Dashboard
-              </Button>
-            </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2" style={{ fontFamily: '"Space Grotesk", sans-serif' }}>
-              Members Management
-            </h1>
-            <p className="text-gray-600">
-              {total} total members • Manage your church community
+            <h1 className="text-3xl font-bold text-gray-900">Members</h1>
+            <p className="text-gray-600 mt-1">
+              Manage church members and their information
             </p>
           </div>
-          <div className="flex items-center space-x-3">
-            <Button variant="outline" className="flex items-center">
+          <div className="mt-4 sm:mt-0 flex gap-2">
+            <Button variant="outline" onClick={refetch} disabled={loading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+            <Button variant="outline" onClick={() => window.print()}>
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
-            <Button 
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={() => router.push('/members/add')}
-            >
+            <Button onClick={() => router.push('/members/add')}>
               <Plus className="h-4 w-4 mr-2" />
               Add Member
             </Button>
           </div>
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <Card className="bg-white shadow-sm border border-gray-100">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Total Members</p>
-                  <p className="text-2xl font-bold text-gray-900" style={{ fontFamily: '"Space Grotesk", sans-serif' }}>
-                    {total}
-                  </p>
-                </div>
-                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-                  <Users className="h-5 w-5 text-blue-600" />
-                </div>
-              </div>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Members</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{total}</div>
+              <p className="text-xs text-muted-foreground">
+                Active members
+              </p>
             </CardContent>
           </Card>
-
-          <Card className="bg-white shadow-sm border border-gray-100">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Active Members</p>
-                  <p className="text-2xl font-bold text-gray-900" style={{ fontFamily: '"Space Grotesk", sans-serif' }}>
-                    {members?.filter(m => m.user?.role === 'member').length || 0}
-                  </p>
-                </div>
-                <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
-                  <User className="h-5 w-5 text-green-600" />
-                </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">New This Year</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {members?.filter(m => m.user?.join_year === new Date().getFullYear()).length || 0}
               </div>
+              <p className="text-xs text-muted-foreground">
+                Joined in {new Date().getFullYear()}
+              </p>
             </CardContent>
           </Card>
-
-          <Card className="bg-white shadow-sm border border-gray-100">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Leadership</p>
-                  <p className="text-2xl font-bold text-gray-900" style={{ fontFamily: '"Space Grotesk", sans-serif' }}>
-                    {members?.filter(m => ['admin', 'pastor', 'elder'].includes(m.user?.role || '')).length || 0}
-                  </p>
-                </div>
-                <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
-                  <Crown className="h-5 w-5 text-purple-600" />
-                </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Elders</CardTitle>
+              <Crown className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {members?.filter(m => m.user?.role === 'elder').length || 0}
               </div>
+              <p className="text-xs text-muted-foreground">
+                Church leadership
+              </p>
             </CardContent>
           </Card>
-
-          <Card className="bg-white shadow-sm border border-gray-100">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">New This Month</p>
-                  <p className="text-2xl font-bold text-gray-900" style={{ fontFamily: '"Space Grotesk", sans-serif' }}>
-                    {members?.filter(m => {
-                      const created = new Date(m.created_at)
-                      const now = new Date()
-                      return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear()
-                    }).length || 0}
-                  </p>
-                </div>
-                <div className="w-10 h-10 bg-yellow-50 rounded-lg flex items-center justify-center">
-                  <Star className="h-5 w-5 text-yellow-600" />
-                </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pastors</CardTitle>
+              <Star className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {members?.filter(m => m.user?.role === 'pastor').length || 0}
               </div>
+              <p className="text-xs text-muted-foreground">
+                Church leadership
+              </p>
             </CardContent>
           </Card>
         </div>
 
-        <Tabs defaultValue="members" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="members">All Members</TabsTrigger>
-            <TabsTrigger value="groups">Groups</TabsTrigger>
-            <TabsTrigger value="attendance">Attendance</TabsTrigger>
-            <TabsTrigger value="sms">SMS</TabsTrigger>
-          </TabsList>
+        {/* Search and Filters */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Search & Filter Members</CardTitle>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowFilters(!showFilters)}
+                >
+                  <Filter className="h-4 w-4 mr-2" />
+                  Filters
+                  <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+                </Button>
+                {(filters.search || filters.role !== 'all' || filters.status !== 'all' || filters.joinYear !== 'all') && (
+                  <Button variant="outline" size="sm" onClick={clearFilters}>
+                    <X className="h-4 w-4 mr-2" />
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search by name or membership ID..."
+                value={filters.search}
+                onChange={(e) => handleSearch(e.target.value)}
+                className="pl-10"
+              />
+            </div>
 
-          {/* Members Tab */}
-          <TabsContent value="members" className="space-y-6">
-            {/* Search and Filters */}
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row gap-4">
-                  <div className="flex-1">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        placeholder="Search members by name or membership ID..."
-                        value={searchTerm}
-                        onChange={(e) => handleSearch(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <select
-                      value={filterType}
-                      onChange={(e) => handleFilter(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            {/* Advanced Filters */}
+            {showFilters && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Role</label>
+                  <Select value={filters.role} onValueChange={(value) => handleFilterChange('role', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All roles" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Roles</SelectItem>
+                      {uniqueRoles.map(role => (
+                        <SelectItem key={role} value={role || ''}>
+                          {(role || '').charAt(0).toUpperCase() + (role || '').slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Status</label>
+                  <Select value={filters.status} onValueChange={(value) => handleFilterChange('status', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                      <SelectItem value="transferred">Transferred</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Join Year</label>
+                  <Select value={filters.joinYear} onValueChange={(value) => handleFilterChange('joinYear', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All years" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Years</SelectItem>
+                      {uniqueJoinYears.map(year => (
+                        <SelectItem key={year} value={year.toString()}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Sort By</label>
+                  <div className="flex gap-2">
+                    <Select value={filters.sortBy} onValueChange={(value) => handleFilterChange('sortBy', value)}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="name">Name</SelectItem>
+                        <SelectItem value="join_date">Join Date</SelectItem>
+                        <SelectItem value="membership_id">Membership ID</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleFilterChange('sortOrder', filters.sortOrder === 'asc' ? 'desc' : 'asc')}
                     >
-                      <option value="all">All Roles</option>
-                      <option value="admin">Admins</option>
-                      <option value="pastor">Pastors</option>
-                      <option value="elder">Elders</option>
-                      <option value="finance_officer">Finance Officers</option>
-                      <option value="member">Members</option>
-                    </select>
+                      {filters.sortOrder === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
+                    </Button>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-            {/* Members Table */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Users className="h-5 w-5 mr-2" />
-                    Members ({total})
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button variant="outline" size="sm">
-                      <Filter className="h-4 w-4 mr-1" />
-                      Filter
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      <Download className="h-4 w-4 mr-1" />
-                      Export
-                    </Button>
-                  </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <LoadingTable rows={10} columns={6} />
-                ) : members && members.length > 0 ? (
-                  <div className="space-y-4">
-                    {members.map((member) => (
-                      <div key={member.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                        <div className="flex items-center space-x-4">
-                          <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                            <User className="h-6 w-6 text-blue-600" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2 mb-1">
-                              <h3 className="font-medium text-gray-900">{member.user?.full_name}</h3>
-                              <Badge className={getRoleColor(member.user?.role || '')}>
-                                {member.user?.role?.replace('_', ' ')}
-                              </Badge>
-                              {member.gender && (
-                                <Badge className={getGenderColor(member.gender)}>
-                                  {member.gender}
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="flex items-center space-x-4 text-sm text-gray-500">
-                              <span className="flex items-center">
-                                <Copy className="h-3 w-3 mr-1" />
-                                {member.user?.membership_id}
-                              </span>
-                              {member.dob && (
-                                <span>Age: {getAge(member.dob)}</span>
-                              )}
-                              <span>Joined: {formatDate(member.created_at)}</span>
-                            </div>
-                            {(member.user?.phone || member.user?.email) && (
-                              <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
-                                {member.user?.phone && (
-                                  <span className="flex items-center">
-                                    <Phone className="h-3 w-3 mr-1" />
-                                    {member.user.phone}
-                                  </span>
-                                )}
-                                {member.user?.email && (
-                                  <span className="flex items-center">
-                                    <Mail className="h-3 w-3 mr-1" />
-                                    {member.user.email}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => copyMembershipId(member.user?.membership_id || '')}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => router.push(`/members/${member.id}`)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => router.push(`/members/${member.id}`)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                    
-                    {/* Load More Button */}
-                    {hasMore && (
-                      <div className="text-center pt-4">
-                        <Button
-                          variant="outline"
-                          onClick={loadMore}
-                          disabled={loading}
-                        >
-                          {loading ? 'Loading...' : 'Load More'}
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <EmptyState
-                    title="No members found"
-                    description={searchTerm ? "Try adjusting your search criteria" : "Get started by adding your first member"}
-                    icon={<Users className="h-12 w-12" />}
-                    action={
-                      <Button onClick={() => router.push('/members/add')}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Member
+        {/* Members List */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Members ({filteredMembers.length})</CardTitle>
+            <CardDescription>
+              {filters.search && `Search results for "${filters.search}"`}
+              {filters.role !== 'all' && ` • Role: ${filters.role}`}
+              {filters.status !== 'all' && ` • Status: ${filters.status}`}
+              {filters.joinYear !== 'all' && ` • Year: ${filters.joinYear}`}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {filteredMembers.length === 0 ? (
+              <EmptyState
+                title="No members found"
+                description={filters.search || filters.role !== 'all' || filters.status !== 'all' || filters.joinYear !== 'all' 
+                  ? "Try adjusting your search or filter criteria."
+                  : members?.length === 0 
+                    ? "No members have been added yet."
+                    : "No members match your current filters."
+                }
+                icon={<Users className="h-12 w-12 text-gray-400" />}
+                action={
+                  <div className="flex gap-2">
+                    {(filters.search || filters.role !== 'all' || filters.status !== 'all' || filters.joinYear !== 'all') && (
+                      <Button variant="outline" onClick={clearFilters}>
+                        Clear Filters
                       </Button>
-                    }
-                  />
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Groups Tab */}
-          <TabsContent value="groups" className="space-y-6">
-            <Card>
-              <CardContent className="text-center py-12">
-                <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Group Management</h3>
-                <p className="text-gray-500 mb-4">Manage church groups and ministries</p>
-                <Button onClick={() => router.push('/groups')}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Go to Groups
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Attendance Tab */}
-          <TabsContent value="attendance" className="space-y-6">
-            <Card>
-              <CardContent className="text-center py-12">
-                <CheckCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Attendance Management</h3>
-                <p className="text-gray-500 mb-4">Track member attendance and services</p>
-                <Button onClick={() => router.push('/attendance/scanner')}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Take Attendance
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* SMS Tab */}
-          <TabsContent value="sms" className="space-y-6">
-            <Card>
-              <CardContent className="text-center py-12">
-                <Mail className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">SMS Messaging</h3>
-                <p className="text-gray-500 mb-4">Send messages to members and groups</p>
-                <Button onClick={() => router.push('/groups')}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Send SMS
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                    )}
+                    <Button onClick={() => router.push('/members/add')}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Member
+                    </Button>
+                  </div>
+                }
+              />
+            ) : (
+              <div className="space-y-4">
+                {filteredMembers.map((member) => (
+                  <div
+                    key={member.id}
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                        <User className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <h3 className="font-medium text-gray-900">
+                            {member.user?.full_name || 'Unknown'}
+                          </h3>
+                          <Badge className={getRoleColor(member.user?.role || '')}>
+                            {member.user?.role || 'member'}
+                          </Badge>
+                          <Badge className={getStatusColor(member.status)}>
+                            {member.status}
+                          </Badge>
+                          {member.user?.marital_status && (
+                            <Badge variant="outline" className="text-xs">
+                              {member.user.marital_status}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center space-x-4 text-sm text-gray-500 mb-2">
+                          <span className="flex items-center">
+                            <Copy className="h-3 w-3 mr-1" />
+                            {formatMembershipIdForDisplay(member.user?.membership_id || '')}
+                          </span>
+                          {member.user?.phone && (
+                            <span className="flex items-center">
+                              <Phone className="h-3 w-3 mr-1" />
+                              {member.user.phone}
+                            </span>
+                          )}
+                          {member.user?.email && (
+                            <span className="flex items-center">
+                              <Mail className="h-3 w-3 mr-1" />
+                              {member.user.email}
+                            </span>
+                          )}
+                          {member.user?.join_year && (
+                            <span className="flex items-center">
+                              <Calendar className="h-3 w-3 mr-1" />
+                              Joined {member.user.join_year}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center space-x-2 text-xs text-gray-400">
+                          {member.address && (
+                            <span className="flex items-center">
+                              <MapPin className="h-3 w-3 mr-1" />
+                              {member.address}
+                            </span>
+                          )}
+                          {member.dob && (
+                            <span className="flex items-center">
+                              <Calendar className="h-3 w-3 mr-1" />
+                              Born {new Date(member.dob).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyMembershipId(member.user?.membership_id || '')}
+                        title="Copy Membership ID"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => router.push(`/members/${member.id}`)}
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        View
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => router.push(`/members/${member.id}?edit=true`)}
+                        title="Edit Member"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
-  )
-}
-
-export default function MembersPage() {
-  return (
-    <ErrorBoundary>
-      <MembersContent />
-    </ErrorBoundary>
   )
 }

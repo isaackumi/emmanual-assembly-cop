@@ -24,13 +24,27 @@ class DataService {
   // Generic error handler
   private handleError(error: any, context: string): string {
     console.error(`Error in ${context}:`, error)
+    console.error('Error type:', typeof error)
+    console.error('Error keys:', error ? Object.keys(error) : 'No keys')
     
     if (error?.message) {
       return error.message
     }
     
+    if (error?.details) {
+      return error.details
+    }
+    
+    if (error?.hint) {
+      return error.hint
+    }
+    
     if (typeof error === 'string') {
       return error
+    }
+    
+    if (error && typeof error === 'object') {
+      return JSON.stringify(error)
     }
     
     return 'An unexpected error occurred'
@@ -130,7 +144,10 @@ class DataService {
         
         this.supabase
           .from('attendance')
-          .select('*')
+          .select(`
+            *,
+            member:members(gender, dob)
+          `)
           .gte('service_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
         
         this.supabase
@@ -150,11 +167,41 @@ class DataService {
       const recentAttendance = attendanceData?.length || 0
       const recentVisitors = visitorsData?.length || 0
 
+      // Calculate attendance analytics
+      const today = new Date().toISOString().split('T')[0]
+      const todayAttendance = attendanceData?.filter(record => record.service_date === today).length || 0
+      
+      // Gender distribution in attendance
+      const maleAttendance = attendanceData?.filter(record => {
+        const member = Array.isArray(record.member) ? record.member[0] : record.member
+        return member?.gender === 'male'
+      }).length || 0
+      
+      const femaleAttendance = attendanceData?.filter(record => {
+        const member = Array.isArray(record.member) ? record.member[0] : record.member
+        return member?.gender === 'female'
+      }).length || 0
+
+      // Age distribution in attendance
+      const adultAttendance = attendanceData?.filter(record => {
+        const member = Array.isArray(record.member) ? record.member[0] : record.member
+        if (!member?.dob) return false
+        const age = new Date().getFullYear() - new Date(member.dob).getFullYear()
+        return age >= 18
+      }).length || 0
+      
+      const childrenAttendance = attendanceData?.filter(record => {
+        const member = Array.isArray(record.member) ? record.member[0] : record.member
+        if (!member?.dob) return false
+        const age = new Date().getFullYear() - new Date(member.dob).getFullYear()
+        return age < 18
+      }).length || 0
+
       const stats: DashboardStats = {
         total_members: totalMembers,
         active_members: totalMembers, // Same as total for now
         visitors: recentVisitors,
-        today_attendance: recentAttendance,
+        today_attendance: todayAttendance,
         weekly_attendance: recentAttendance,
         monthly_donations: 0,
         pending_pledges: 0,
@@ -164,7 +211,13 @@ class DataService {
         groups_count: totalGroups,
         recent_visitors: recentVisitors,
         attendance_rate: totalMembers > 0 ? Math.round((recentAttendance / totalMembers) * 100) : 0,
-        visitor_conversion_rate: recentVisitors > 0 ? Math.round((recentVisitors / (recentVisitors + totalMembers)) * 100) : 0
+        visitor_conversion_rate: recentVisitors > 0 ? Math.round((recentVisitors / (recentVisitors + totalMembers)) * 100) : 0,
+        // Enhanced attendance analytics
+        male_attendance: maleAttendance,
+        female_attendance: femaleAttendance,
+        adult_attendance: adultAttendance,
+        children_attendance: childrenAttendance,
+        total_attendance: recentAttendance
       }
 
       // Cache the result
@@ -175,48 +228,89 @@ class DataService {
 
   // Members Data
   async getMembers(page: number = 1, limit: number = 20, search?: string): Promise<PaginatedResponse<Member>> {
-    const cacheKey = cacheKeys.members(page, limit, search)
-    const cached = cache.get<{ data: Member[]; total: number }>(cacheKey)
-    
-    if (cached) {
-      const hasMore = (page * limit) < cached.total
+    try {
+      const cacheKey = cacheKeys.members(page, limit, search)
+      const cached = cache.get<{ data: Member[]; total: number }>(cacheKey)
+      
+      if (cached) {
+        const hasMore = (page * limit) < cached.total
+        return {
+          data: cached.data,
+          total: cached.total,
+          page,
+          limit,
+          hasMore,
+          error: null,
+          loading: false
+        }
+      }
+
+      console.log('Fetching members with params:', { page, limit, search })
+
+      return this.fetchPaginatedData(async () => {
+        // First, let's try a simple query to see if the table exists
+        const { data: testData, error: testError } = await this.supabase
+          .from('members')
+          .select('id')
+          .limit(1)
+
+        if (testError) {
+          console.error('Test query failed:', testError)
+          throw new Error(`Database connection failed: ${testError.message || JSON.stringify(testError)}`)
+        }
+
+        let query = this.supabase
+          .from('members')
+          .select(`
+            *,
+            user:app_users(
+              id, full_name, membership_id, phone, email, role, 
+              marital_status, created_at, join_year, updated_at
+            )
+          `, { count: 'exact' })
+          .eq('status', 'active')
+
+        if (search) {
+          query = query.or(`user.full_name.ilike.%${search}%,user.membership_id.ilike.%${search}%`)
+        }
+
+        const { data, error, count } = await query
+          .order('created_at', { ascending: false })
+          .range((page - 1) * limit, page * limit - 1)
+
+        console.log('Members query result:', { 
+          dataLength: data?.length, 
+          error: error ? {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
+          } : null, 
+          count 
+        })
+
+        if (error) {
+          throw new Error(`Query failed: ${error.message || JSON.stringify(error)}`)
+        }
+
+        // Cache the result
+        if (data) {
+          cache.set(cacheKey, { data, total: count || 0 }, cacheTTL.MEDIUM)
+        }
+        return { data, error, count }
+      }, page, limit, 'getMembers')
+    } catch (error) {
+      console.error('Error in getMembers:', error)
       return {
-        data: cached.data,
-        total: cached.total,
+        data: [],
+        total: 0,
         page,
         limit,
-        hasMore,
-        error: null,
+        hasMore: false,
+        error: this.handleError(error, 'getMembers'),
         loading: false
       }
     }
-
-    return this.fetchPaginatedData(async () => {
-      let query = this.supabase
-        .from('members')
-        .select(`
-          *,
-          user:app_users(
-            id, full_name, membership_id, phone, email, role, 
-            marital_status, created_at, join_year, updated_at
-          )
-        `, { count: 'exact' })
-        .eq('status', 'active')
-
-      if (search) {
-        query = query.or(`user.full_name.ilike.%${search}%,user.membership_id.ilike.%${search}%`)
-      }
-
-      const { data, error, count } = await query
-        .order('created_at', { ascending: false })
-        .range((page - 1) * limit, page * limit - 1)
-
-      // Cache the result
-      if (!error && data) {
-        cache.set(cacheKey, { data, total: count || 0 }, cacheTTL.MEDIUM)
-      }
-      return { data, error, count }
-    }, page, limit, 'getMembers')
   }
 
   async getMember(id: string): Promise<ApiResponse<Member>> {
@@ -632,6 +726,19 @@ class DataService {
     }, 'getUpcomingEvents')
   }
 
+  async getAttendanceByMember(memberId: string, limit: number = 50): Promise<ApiResponse<Attendance[]>> {
+    return this.fetchData(async () => {
+      const { data, error } = await this.supabase
+        .from('attendance')
+        .select('*')
+        .eq('member_id', memberId)
+        .order('service_date', { ascending: false })
+        .limit(limit)
+
+      return { data: (data as unknown as Attendance[]) || [], error }
+    }, 'getAttendanceByMember')
+  }
+
   private getUpcomingEventDays(dateString: string, type: 'birthday' | 'anniversary'): number | null {
     try {
       const today = new Date()
@@ -653,6 +760,80 @@ class DataService {
       return diffDays >= 0 ? diffDays : null
     } catch (error) {
       return null
+    }
+  }
+
+
+
+  async getAttendanceAnalytics(filters: {
+    timeRange?: string
+    serviceType?: string
+  } = {}): Promise<{ data: any, error: string | null }> {
+    try {
+      // Calculate date range
+      const now = new Date()
+      let startDate = new Date()
+      
+      switch (filters.timeRange) {
+        case '7d':
+          startDate.setDate(now.getDate() - 7)
+          break
+        case '30d':
+          startDate.setDate(now.getDate() - 30)
+          break
+        case '90d':
+          startDate.setDate(now.getDate() - 90)
+          break
+        case '1y':
+          startDate.setFullYear(now.getFullYear() - 1)
+          break
+        default:
+          startDate.setDate(now.getDate() - 30)
+      }
+
+      // Fetch attendance records
+      let query = this.supabase
+        .from('attendance')
+        .select(`
+          id,
+          member_id,
+          service_date,
+          service_type,
+          check_in_time,
+          status,
+          member:app_users(full_name, membership_id)
+        `)
+        .gte('service_date', startDate.toISOString().split('T')[0])
+        .eq('status', 'present')
+
+      if (filters.serviceType && filters.serviceType !== 'all') {
+        query = query.eq('service_type', filters.serviceType)
+      }
+
+      const { data: attendanceData, error: attendanceError } = await query
+
+      if (attendanceError) throw attendanceError
+
+      // Process analytics data (simplified version)
+      const processedAnalytics = {
+        total_attendance: attendanceData?.length || 0,
+        average_attendance: 0,
+        attendance_trend: 'stable' as const,
+        attendance_change_percentage: 0,
+        service_breakdown: [],
+        daily_attendance: [],
+        weekly_attendance: [],
+        monthly_attendance: [],
+        attendance_by_gender: []
+      }
+
+      return { data: processedAnalytics, error: null }
+    } catch (error) {
+      console.error('Error fetching attendance analytics:', error)
+      return {
+        data: null,
+        error: error instanceof Error ? error.message : 'Failed to fetch attendance analytics'
+      }
     }
   }
 

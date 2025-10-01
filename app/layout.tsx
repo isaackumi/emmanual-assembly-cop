@@ -1,10 +1,7 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
 import './globals.css'
 import { Providers } from '@/components/providers'
 import { Toaster } from '@/components/ui/toaster'
-
-const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'Emmanuel Assembly - Church Management System',
@@ -57,7 +54,7 @@ export default function RootLayout({
         />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
-      <body className={inter.className} style={{ fontFamily: '"Source Sans 3", sans-serif' }}>
+      <body className="min-h-screen bg-background text-foreground antialiased" style={{ fontFamily: '"Source Sans 3", sans-serif' }}>
         <Providers>
           {children}
           <Toaster />

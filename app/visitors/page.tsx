@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { createClient } from '@/lib/supabase/client'
+import { dataService } from '@/lib/services/data-service'
+import { useQuery } from '@tanstack/react-query'
 import { Visitor } from '@/lib/types'
 import { formatDate } from '@/lib/utils'
 import { 
@@ -32,10 +33,7 @@ import {
 export default function VisitorsPage() {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
-  const supabase = createClient()
-
   const [visitors, setVisitors] = useState<Visitor[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
 
@@ -45,38 +43,18 @@ export default function VisitorsPage() {
     }
   }, [user, authLoading, router])
 
+  const visitorsQuery = useQuery({
+    queryKey: ['visitors', user?.id],
+    queryFn: async () => dataService.getVisitors(1, 200),
+    enabled: Boolean(user),
+    staleTime: 30_000
+  })
+
   useEffect(() => {
-    if (user) {
-      fetchVisitors()
+    if (visitorsQuery.data?.data) {
+      setVisitors(visitorsQuery.data.data as unknown as Visitor[])
     }
-  }, [user])
-
-  const fetchVisitors = async () => {
-    try {
-      setLoading(true)
-      console.log('Fetching visitors...')
-      const { data, error } = await supabase
-        .from('visitors')
-        .select(`
-          *,
-          invited_by:members(user:app_users(full_name))
-        `)
-        .eq('status', 'active')
-        .order('visit_date', { ascending: false })
-
-      if (error) {
-        console.error('Error fetching visitors:', error)
-        throw error
-      }
-      
-      console.log('Visitors fetched:', data)
-      setVisitors(data || [])
-    } catch (error) {
-      console.error('Error fetching visitors:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [visitorsQuery.data])
 
   const filteredVisitors = visitors.filter(visitor => {
     const matchesSearch = searchTerm === '' || 
@@ -107,7 +85,7 @@ export default function VisitorsPage() {
   }
 
   // Show loading state
-  if (authLoading || loading) {
+  if (authLoading || visitorsQuery.isLoading || visitorsQuery.isFetching) {
     return (
       <div className="min-h-screen bg-gray-50 p-8">
         <div className="max-w-7xl mx-auto">

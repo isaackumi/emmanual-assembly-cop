@@ -138,8 +138,7 @@ async function seedMembers() {
           email: memberData.email,
           membership_id: memberData.membership_id,
           role: memberData.role,
-          join_year: memberData.join_year,
-          profile_completion: 75 // Set some profile completion
+          join_year: memberData.join_year
         })
         .select()
         .single()
